@@ -1,0 +1,17 @@
+sdkPlatform=android-36.1
+sdkPlatformRevision=1
+sdkApiLevel=36.1
+compileSdk=36.1
+targetSdk=36
+minSdk=26
+buildTools=36.0.0
+Pkg.Revision=36.0.0
+AIDL Compiler: built for platform SDK version 36
+Android Asset Packaging Tool (aapt) 2.20-13193326
+D8 8.10.9-dev (build a7ad18a70460b799d0482e497c109a75bf7f91de from go/r8bot (luci-r8-custom-ci-archive-0-mt8s))
+javac 21.0.3
+platformPackage=Pkg.Desc=Android SDK Platform 16; Pkg.Revision=1
+Android Debug Bridge version 1.0.41
+Version 35.0.2-12147458
+Installed as D:\Android\platform-tools\adb.exe
+Running on Windows 10.0.26200

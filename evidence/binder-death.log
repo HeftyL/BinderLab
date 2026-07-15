@@ -1,0 +1,32 @@
+--------- beginning of main
+07-15 13:55:03.431  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:55:03.432  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:55:03.435  5895  5909 I BinderLab: S_REGISTER_CALLBACK pid=5895 tid=5909 thread=binder:5895_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:55:03.437  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:55:03.437  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:55:03.452  5877  5877 I BinderLab: C_CONNECTED_ACTIVE pid=5877 tid=5877 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:55:03.454  5877  5925 I BinderLab: C_EXPERIMENT_BEGIN pid=5877 tid=5925 thread=BinderLab-binder-death mode=binder-death
+07-15 13:55:03.454  5877  5925 I BinderLab: C_LAST_SUCCESS_BEGIN pid=5877 tid=5925 thread=BinderLab-binder-death requestId=1001 atNs=122227143777675
+07-15 13:55:03.456  5895  5909 I BinderLab: S0 pid=5895 tid=5909 thread=binder:5895_2 requestId=1001 atNs=122227145295521 callingUid=10217 injectHandlerBlocker=false
+07-15 13:55:03.457  5895  5909 I BinderLab: H0A pid=5895 tid=5909 thread=binder:5895_2 requestId=1001 atNs=122227146140983
+07-15 13:55:03.458  5895  5909 I BinderLab: H0B pid=5895 tid=5909 thread=binder:5895_2 requestId=1001 atNs=122227146699521 postAccepted=true injectHandlerBlocker=false postCallNs=558538
+07-15 13:55:03.459  5895  5922 I BinderLab: H1 pid=5895 tid=5922 thread=CalculatorWorker requestId=1001 atNs=122227148333675 queueNs=1634154
+07-15 13:55:03.460  5895  5922 I BinderLab: H2 pid=5895 tid=5922 thread=CalculatorWorker requestId=1001 atNs=122227149175752 runNs=842077
+07-15 13:55:03.461  5895  5909 I BinderLab: S1 pid=5895 tid=5909 thread=binder:5895_2 requestId=1001 atNs=122227150145291 serverNs=4849770
+07-15 13:55:03.462  5877  5925 I BinderLab: C_LAST_SUCCESS_END pid=5877 tid=5925 thread=BinderLab-binder-death requestId=1001 atNs=122227151444368 result=42
+07-15 13:55:03.463  5877  5925 I BinderLab: C_DEATH_EXPERIMENT_ARMED pid=5877 tid=5925 thread=BinderLab-binder-death connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 note=host must kill the remote process
+07-15 13:55:03.463  5877  5925 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5877 tid=5925 thread=BinderLab-binder-death mode=binder-death
+07-15 13:55:03.870  5877  5887 I BinderLab: C_UNLINK_TO_DEATH pid=5877 tid=5887 thread=binder:5877_2 connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 removed=true
+07-15 13:55:03.871  5877  5887 W BinderLab: C_GENERATION_INVALID pid=5877 tid=5887 thread=binder:5877_2 connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=ACTIVE newState=INVALID wasCurrent=true reason=binderDied
+07-15 13:55:03.871  5877  5877 I BinderLab: C_CONNECTION_CALLBACK_IGNORED pid=5877 tid=5877 thread=main connectionEpoch=1 current=none reason=service disconnected
+07-15 13:55:03.873  5877  5932 I BinderLab: C_OLD_PROXY_PROBE_BEGIN pid=5877 tid=5932 thread=BinderLab-dead-proxy-probe connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 requestId=1002
+07-15 13:55:03.875  5877  5932 I BinderLab: C_OLD_PROXY_DEAD_OBJECT pid=5877 tid=5932 thread=BinderLab-dead-proxy-probe connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 requestId=1002 exception=DeadObjectException
+07-15 13:55:03.885  5877  5877 I BinderLab: C_TEST_REBIND_BEGIN pid=5877 tid=5877 thread=main oldConnectionEpoch=1 newConnectionEpoch=2 reason=binder-death experiment
+07-15 13:55:03.895  5877  5877 I BinderLab: C_TEST_REBIND_RESULT pid=5877 tid=5877 thread=main connectionEpoch=2 bound=true
+07-15 13:55:04.310  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:55:04.311  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:55:04.314  5935  5947 I BinderLab: S_REGISTER_CALLBACK pid=5935 tid=5947 thread=binder:5935_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:55:04.316  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:55:04.316  5877  5877 I BinderLab: C_GENERATION_STATE pid=5877 tid=5877 thread=main connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:55:04.325  5877  5877 I BinderLab: C_CONNECTED_ACTIVE pid=5877 tid=5877 thread=main connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:55:04.325  5877  5877 I BinderLab: C_EXPERIMENT_NOT_RESTARTED pid=5877 tid=5877 thread=main mode=binder-death connectionEpoch=2 generationId=2 binderIdentity=android.os.BinderProxy@dd2d0e4 reason=activity-experiment-is-one-shot

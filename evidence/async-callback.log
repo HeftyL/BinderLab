@@ -1,0 +1,15 @@
+--------- beginning of main
+07-15 13:55:01.725  5814  5814 I BinderLab: C_GENERATION_STATE pid=5814 tid=5814 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:55:01.726  5814  5814 I BinderLab: C_GENERATION_STATE pid=5814 tid=5814 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:55:01.729  5831  5846 I BinderLab: S_REGISTER_CALLBACK pid=5831 tid=5846 thread=binder:5831_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:55:01.731  5814  5814 I BinderLab: C_GENERATION_STATE pid=5814 tid=5814 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:55:01.732  5814  5814 I BinderLab: C_GENERATION_STATE pid=5814 tid=5814 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:55:01.744  5814  5814 I BinderLab: C_CONNECTED_ACTIVE pid=5814 tid=5814 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:55:01.746  5814  5860 I BinderLab: C_EXPERIMENT_BEGIN pid=5814 tid=5860 thread=BinderLab-async-callback mode=async-callback
+07-15 13:55:01.747  5814  5860 I BinderLab: C_ASYNC_CALL_BEGIN pid=5814 tid=5860 thread=BinderLab-async-callback requestId=1001
+07-15 13:55:01.748  5814  5860 I BinderLab: C_ASYNC_CALL_RETURN pid=5814 tid=5860 thread=BinderLab-async-callback requestId=1001 completion=server Handler/callback may still be pending
+07-15 13:55:01.748  5831  5846 I BinderLab: S_HANDLER_POST pid=5831 tid=5846 thread=binder:5831_2 requestId=1001 value=7
+07-15 13:55:01.750  5831  5859 I BinderLab: S_HANDLER_RUN pid=5831 tid=5859 thread=CalculatorWorker requestId=1001 value=7
+07-15 13:55:01.751  5814  5824 I BinderLab: C_CALLBACK pid=5814 tid=5824 thread=binder:5814_2 requestId=1001 value=7 requestMatches=true
+07-15 13:55:01.752  5814  5860 I BinderLab: C_ASYNC_CALLBACK_OBSERVED pid=5814 tid=5860 thread=BinderLab-async-callback requestId=1001
+07-15 13:55:01.752  5814  5860 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5814 tid=5860 thread=BinderLab-async-callback mode=async-callback

@@ -1,0 +1,27 @@
+--------- beginning of main
+07-15 13:54:58.387  5727  5727 I BinderLab: C_GENERATION_STATE pid=5727 tid=5727 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:54:58.388  5727  5727 I BinderLab: C_GENERATION_STATE pid=5727 tid=5727 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:54:58.392  5745  5763 I BinderLab: S_REGISTER_CALLBACK pid=5745 tid=5763 thread=binder:5745_3 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:54:58.393  5727  5727 I BinderLab: C_GENERATION_STATE pid=5727 tid=5727 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:54:58.394  5727  5727 I BinderLab: C_GENERATION_STATE pid=5727 tid=5727 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:54:58.408  5727  5727 I BinderLab: C_CONNECTED_ACTIVE pid=5727 tid=5727 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:54:58.411  5727  5775 I BinderLab: C_EXPERIMENT_BEGIN pid=5727 tid=5775 thread=BinderLab-oneway-cross-node mode=oneway-cross-node
+07-15 13:54:58.420  5727  5775 I BinderLab: C_CROSS_NODE_RELEASE pid=5727 tid=5775 thread=BinderLab-oneway-cross-node n1RequestIds=1001,1002 n2RequestIds=1003,1004
+07-15 13:54:58.420  5727  5776 I BinderLab: C_N1_CALL_BEGIN pid=5727 tid=5776 thread=BinderLab-N1-sender requestId=1001 atNs=122222109868444
+07-15 13:54:58.421  5727  5776 I BinderLab: C_N1_CALL_RETURN pid=5727 tid=5776 thread=BinderLab-N1-sender requestId=1001 atNs=122222110868367 callNs=999923
+07-15 13:54:58.422  5727  5776 I BinderLab: C_N1_CALL_BEGIN pid=5727 tid=5776 thread=BinderLab-N1-sender requestId=1002 atNs=122222111456752
+07-15 13:54:58.422  5745  5763 I BinderLab: S_ASYNC_WORKER_ENTER pid=5745 tid=5763 thread=binder:5745_3 node=N1 requestId=1001 value=1 begin=122222111114213
+07-15 13:54:58.422  5727  5776 I BinderLab: C_N1_CALL_RETURN pid=5727 tid=5776 thread=BinderLab-N1-sender requestId=1002 atNs=122222111982906 callNs=526154
+07-15 13:54:58.423  5727  5777 I BinderLab: C_N2_CALL_BEGIN pid=5727 tid=5777 thread=BinderLab-N2-sender requestId=1003 atNs=122222112786521
+07-15 13:54:58.424  5727  5777 I BinderLab: C_N2_CALL_RETURN pid=5727 tid=5777 thread=BinderLab-N2-sender requestId=1003 atNs=122222113728060 callNs=941539
+07-15 13:54:58.424  5727  5777 I BinderLab: C_N2_CALL_BEGIN pid=5727 tid=5777 thread=BinderLab-N2-sender requestId=1004 atNs=122222114149367
+07-15 13:54:58.425  5727  5777 I BinderLab: C_N2_CALL_RETURN pid=5727 tid=5777 thread=BinderLab-N2-sender requestId=1004 atNs=122222115057598 callNs=908231
+07-15 13:54:58.427  5745  5760 I BinderLab: S_ASYNC_WORKER_ENTER pid=5745 tid=5760 thread=binder:5745_2 node=N2 requestId=1003 value=3 begin=122222116527752
+07-15 13:54:58.429  5727  5775 I BinderLab: C_CROSS_NODE_RETURN pid=5727 tid=5775 thread=BinderLab-oneway-cross-node note=all transact calls returned; inspect server intervals
+07-15 13:54:58.429  5727  5775 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5727 tid=5775 thread=BinderLab-oneway-cross-node mode=oneway-cross-node
+07-15 13:54:59.123  5745  5763 I BinderLab: S_ASYNC_WORKER_EXIT pid=5745 tid=5763 thread=binder:5745_3 node=N1 requestId=1001 value=1 end=122222812257060 runNs=701142847
+07-15 13:54:59.125  5745  5763 I BinderLab: S_ASYNC_WORKER_ENTER pid=5745 tid=5763 thread=binder:5745_3 node=N1 requestId=1002 value=2 begin=122222814555752
+07-15 13:54:59.128  5745  5760 I BinderLab: S_ASYNC_WORKER_EXIT pid=5745 tid=5760 thread=binder:5745_2 node=N2 requestId=1003 value=3 end=122222817975444 runNs=701447692
+07-15 13:54:59.129  5745  5760 I BinderLab: S_ASYNC_WORKER_ENTER pid=5745 tid=5760 thread=binder:5745_2 node=N2 requestId=1004 value=4 begin=122222818818521
+07-15 13:54:59.827  5745  5763 I BinderLab: S_ASYNC_WORKER_EXIT pid=5745 tid=5763 thread=binder:5745_3 node=N1 requestId=1002 value=2 end=122223516491137 runNs=701935385
+07-15 13:54:59.830  5745  5760 I BinderLab: S_ASYNC_WORKER_EXIT pid=5745 tid=5760 thread=binder:5745_2 node=N2 requestId=1004 value=4 end=122223519946290 runNs=701127769

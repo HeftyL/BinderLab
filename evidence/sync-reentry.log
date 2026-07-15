@@ -1,0 +1,14 @@
+--------- beginning of main
+07-15 13:54:53.911  5590  5590 I BinderLab: C_GENERATION_STATE pid=5590 tid=5590 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:54:53.912  5590  5590 I BinderLab: C_GENERATION_STATE pid=5590 tid=5590 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:54:53.916  5608  5622 I BinderLab: S_REGISTER_CALLBACK pid=5608 tid=5622 thread=binder:5608_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:54:53.917  5590  5590 I BinderLab: C_GENERATION_STATE pid=5590 tid=5590 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:54:53.918  5590  5590 I BinderLab: C_GENERATION_STATE pid=5590 tid=5590 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:54:53.934  5590  5590 I BinderLab: C_CONNECTED_ACTIVE pid=5590 tid=5590 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:54:53.938  5590  5636 I BinderLab: C_EXPERIMENT_BEGIN pid=5590 tid=5636 thread=BinderLab-sync-reentry mode=sync-reentry
+07-15 13:54:53.939  5590  5636 I BinderLab: C_SYNC_CALL_BEGIN pid=5590 tid=5636 thread=BinderLab-sync-reentry requestId=1001 callerTid=5636 atNs=122217628155213
+07-15 13:54:53.941  5608  5622 I BinderLab: S_BEFORE_SYNC_CALLBACK pid=5608 tid=5622 thread=binder:5608_2 requestId=1001 result=5 atNs=122217630738598
+07-15 13:54:53.943  5590  5636 I BinderLab: C_SYNC_CALLBACK pid=5590 tid=5636 thread=BinderLab-sync-reentry requestId=1001 value=5 requestMatches=true insideOuterCall=true waitingTid=5636 reusedWaitingThread=true atNs=122217632629367
+07-15 13:54:53.945  5608  5622 I BinderLab: S_AFTER_SYNC_CALLBACK pid=5608 tid=5622 thread=binder:5608_2 requestId=1001 callbackResult=10 atNs=122217634387444
+07-15 13:54:53.946  5590  5636 I BinderLab: C_SYNC_CALL_END pid=5590 tid=5636 thread=BinderLab-sync-reentry requestId=1001 result=5 atNs=122217635752982
+07-15 13:54:53.947  5590  5636 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5590 tid=5636 thread=BinderLab-sync-reentry mode=sync-reentry

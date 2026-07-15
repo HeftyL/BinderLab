@@ -1,0 +1,17 @@
+apkFile=BinderLab-debug.apk
+apkSha256=dc4ad7b60a00718f4da5113627219e36396a30df61ee243125442daf74cc59fc
+package: name='com.example.binderdemo' versionCode='' versionName='' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+minSdkVersion:'26'
+targetSdkVersion:'36'
+application: label='BinderLab' icon=''
+application-debuggable
+launchable-activity: name='com.example.binderdemo.MainActivity'  label='' icon=''
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+main
+other-services
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales:
+densities:

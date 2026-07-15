@@ -1,0 +1,9 @@
+captureId=20260716T002641866-133cce3806fe
+captureStartedAt=2026-07-16T00:26:41.8665620+08:00
+captureCompletedAt=2026-07-16T00:27:30.4121618+08:00
+gitCommit=bc3326901989f07d6d5b5381d2ba9a4f7e372549
+gitBranch=detached
+gitDirty=false
+gitDirtyScope=repository-at-capture-start
+sourceManifestSha256=f8041ccd8e3b89662fb339c4164fc98da11816bc60fe8bdefd59bd0a8b63dc24
+apkSha256=dc4ad7b60a00718f4da5113627219e36396a30df61ee243125442daf74cc59fc

@@ -59,7 +59,15 @@ jobs:
             BuildToolsVersion = "36.0.0"
           }
           if ("${{ github.event_name }}" -eq "push") {
-            $verifyArgs.DiffBase = "${{ github.event.before }}"
+            $before = "${{ github.event.before }}"
+            if ($before -notmatch "^0{40}$") {
+              & git cat-file -e "${before}^{commit}" 2>$null
+              if ($LASTEXITCODE -eq 0) {
+                $verifyArgs.DiffBase = "${{ github.event.before }}"
+              } else {
+                Write-Host "Push base $before is unavailable after history rewrite; validating current HEAD."
+              }
+            }
           }
           .\verify.ps1 @verifyArgs
 

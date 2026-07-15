@@ -1,0 +1,23 @@
+--------- beginning of main
+07-15 13:54:55.623  5654  5654 I BinderLab: C_GENERATION_STATE pid=5654 tid=5654 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:54:55.623  5654  5654 I BinderLab: C_GENERATION_STATE pid=5654 tid=5654 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:54:55.626  5672  5687 I BinderLab: S_REGISTER_CALLBACK pid=5672 tid=5687 thread=binder:5672_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:54:55.628  5654  5654 I BinderLab: C_GENERATION_STATE pid=5654 tid=5654 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:54:55.628  5654  5654 I BinderLab: C_GENERATION_STATE pid=5654 tid=5654 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:54:55.641  5654  5654 I BinderLab: C_CONNECTED_ACTIVE pid=5654 tid=5654 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:54:55.643  5654  5701 I BinderLab: C_EXPERIMENT_BEGIN pid=5654 tid=5701 thread=BinderLab-oneway-same-node mode=oneway-same-node
+07-15 13:54:55.644  5654  5701 I BinderLab: C_ONEWAY_BURST_BEGIN pid=5654 tid=5701 thread=BinderLab-oneway-same-node node=ICalculator requestIds=1001,1002,1003
+07-15 13:54:55.645  5654  5701 I BinderLab: C_SAME_NODE_CALL_BEGIN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1001 atNs=122219333918829
+07-15 13:54:55.645  5654  5701 I BinderLab: C_SAME_NODE_CALL_RETURN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1001 atNs=122219334817598 callNs=898769
+07-15 13:54:55.646  5654  5701 I BinderLab: C_SAME_NODE_CALL_BEGIN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1002 atNs=122219335332444
+07-15 13:54:55.646  5672  5687 I BinderLab: S_ONEWAY_ENTER pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1001 value=1 begin=122219335134906
+07-15 13:54:55.646  5654  5701 I BinderLab: C_SAME_NODE_CALL_RETURN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1002 atNs=122219335830521 callNs=498077
+07-15 13:54:55.647  5654  5701 I BinderLab: C_SAME_NODE_CALL_BEGIN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1003 atNs=122219336189059
+07-15 13:54:55.647  5654  5701 I BinderLab: C_SAME_NODE_CALL_RETURN pid=5654 tid=5701 thread=BinderLab-oneway-same-node requestId=1003 atNs=122219336731213 callNs=542154
+07-15 13:54:55.648  5654  5701 I BinderLab: C_ONEWAY_BURST_RETURN pid=5654 tid=5701 thread=BinderLab-oneway-same-node note=all transact calls returned; server completion is not implied
+07-15 13:54:55.648  5654  5701 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5654 tid=5701 thread=BinderLab-oneway-same-node mode=oneway-same-node
+07-15 13:54:55.947  5672  5687 I BinderLab: S_ONEWAY_EXIT pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1001 value=1 end=122219636570290 runNs=301435384
+07-15 13:54:55.948  5672  5687 I BinderLab: S_ONEWAY_ENTER pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1002 value=2 begin=122219637852982
+07-15 13:54:56.249  5672  5687 I BinderLab: S_ONEWAY_EXIT pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1002 value=2 end=122219938920752 runNs=301067770
+07-15 13:54:56.250  5672  5687 I BinderLab: S_ONEWAY_ENTER pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1003 value=3 begin=122219939956136
+07-15 13:54:56.552  5672  5687 I BinderLab: S_ONEWAY_EXIT pid=5672 tid=5687 thread=binder:5672_2 node=ICalculator requestId=1003 value=3 end=122220241195752 runNs=301239616

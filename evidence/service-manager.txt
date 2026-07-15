@@ -1,0 +1,8 @@
+command=adb shell service check activity
+Service activity: found
+
+command=adb shell service list (activity entry only)
+7	activity: [android.app.IActivityManager]
+
+command=adb shell dumpsys --pid activity
+1430

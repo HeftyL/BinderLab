@@ -1,0 +1,17 @@
+captureId=20260716T002641866-133cce3806fe
+hostCapturedAt=2026-07-16T00:26:41.8665620+08:00
+hostTimeZoneId=China Standard Time
+hostUtcOffset=+08:00
+deviceDate=2026-07-15T13:54:24+0800
+deviceTimeZone=Asia/Shanghai
+deviceElapsedRealtimeSeconds=122188.43
+adbState=device
+AndroidVersion=16
+ApiLevel=36
+BuildType=userdebug
+KernelVersion=6.6
+Model=redacted
+Fingerprint=redacted
+Carrier=redacted
+deviceAlias=device-01
+serialHash=not-recorded

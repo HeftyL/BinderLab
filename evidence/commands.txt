@@ -1,0 +1,25 @@
+# Commands used for this evidence package.
+# The public metadata intentionally omits the adb serial and product identity.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SdkRoot 'D:\Android' -CompileSdkPlatform '36.1' -BuildToolsVersion '36.0.0'
+& 'D:\Android\platform-tools\adb.exe' install -r .\build\BinderLab-debug.apk
+
+# run-experiment.ps1 performs force-stop, logcat -c, am start -W, then polls the mode-specific terminal marker.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-baseline' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-baseline-run-01.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-baseline' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-baseline-run-02.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-baseline' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-baseline-run-03.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-baseline' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-baseline-run-04.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-baseline' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-baseline-run-05.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-blocked' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-blocked-run-01.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-blocked' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-blocked-run-02.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-blocked' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-blocked-run-03.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-blocked' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-blocked-run-04.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'handler-latency-blocked' -SdkRoot 'D:\Android' -OutputPath '.\evidence\handler-latency-blocked-run-05.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'sync-reentry' -SdkRoot 'D:\Android' -OutputPath '.\evidence\sync-reentry.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'oneway-same-node' -SdkRoot 'D:\Android' -OutputPath '.\evidence\oneway-same-node.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'oneway-cross-node' -SdkRoot 'D:\Android' -OutputPath '.\evidence\oneway-cross-node.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'async-callback' -SdkRoot 'D:\Android' -OutputPath '.\evidence\async-callback.log' -SkipInstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-experiment.ps1 -Mode 'binder-death' -SdkRoot 'D:\Android' -OutputPath '.\evidence\binder-death.log' -SkipInstall
+
+# binder-death additionally resolves only the remote PID, then runs:
+& 'D:\Android\platform-tools\adb.exe' shell run-as com.example.binderdemo kill -9 <remotePid>
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\analyze-evidence.ps1 -CaptureId '20260716T002641866-133cce3806fe' -CaptureStartedAt '2026-07-16T00:26:41.8665620+08:00'

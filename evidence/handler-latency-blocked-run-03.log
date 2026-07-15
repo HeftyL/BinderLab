@@ -1,0 +1,17 @@
+--------- beginning of main
+07-15 13:54:43.609  5339  5339 I BinderLab: C_GENERATION_STATE pid=5339 tid=5339 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=NONE newState=CONNECTING reason=onServiceConnected
+07-15 13:54:43.609  5339  5339 I BinderLab: C_GENERATION_STATE pid=5339 tid=5339 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=CONNECTING newState=LINKED reason=linkToDeath succeeded
+07-15 13:54:43.613  5358  5372 I BinderLab: S_REGISTER_CALLBACK pid=5358 tid=5372 thread=binder:5358_2 callbackClass=com.example.binderdemo.IResultCallback$Stub$Proxy callbackBinderClass=android.os.BinderProxy
+07-15 13:54:43.614  5339  5339 I BinderLab: C_GENERATION_STATE pid=5339 tid=5339 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=LINKED newState=REGISTERED reason=callback registered
+07-15 13:54:43.616  5339  5339 I BinderLab: C_GENERATION_STATE pid=5339 tid=5339 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 oldState=REGISTERED newState=ACTIVE reason=published to readers
+07-15 13:54:43.629  5339  5339 I BinderLab: C_CONNECTED_ACTIVE pid=5339 tid=5339 thread=main connectionEpoch=1 generationId=1 binderIdentity=android.os.BinderProxy@7a95e76 calculatorClass=com.example.binderdemo.ICalculator$Stub$Proxy calculatorBinderClass=android.os.BinderProxy
+07-15 13:54:43.631  5339  5385 I BinderLab: C_EXPERIMENT_BEGIN pid=5339 tid=5385 thread=BinderLab-handler-latency-blocked mode=handler-latency-blocked
+07-15 13:54:43.631  5339  5385 I BinderLab: C0 pid=5339 tid=5385 thread=BinderLab-handler-latency-blocked requestId=1001 atNs=122207320736443 injectHandlerBlocker=true
+07-15 13:54:43.633  5358  5372 I BinderLab: S0 pid=5358 tid=5372 thread=binder:5358_2 requestId=1001 atNs=122207322293905 callingUid=10217 injectHandlerBlocker=true
+07-15 13:54:43.635  5358  5372 I BinderLab: H0A pid=5358 tid=5372 thread=binder:5358_2 requestId=1001 atNs=122207323587828
+07-15 13:54:43.635  5358  5372 I BinderLab: H0B pid=5358 tid=5372 thread=binder:5358_2 requestId=1001 atNs=122207324023136 postAccepted=true injectHandlerBlocker=true postCallNs=435308
+07-15 13:54:45.138  5358  5384 I BinderLab: H1 pid=5358 tid=5384 thread=CalculatorWorker requestId=1001 atNs=122208827116366 queueNs=1503093230
+07-15 13:54:45.138  5358  5384 I BinderLab: H2 pid=5358 tid=5384 thread=CalculatorWorker requestId=1001 atNs=122208827515443 runNs=399077
+07-15 13:54:45.139  5358  5372 I BinderLab: S1 pid=5358 tid=5372 thread=binder:5358_2 requestId=1001 atNs=122208828279136 serverNs=1505985231
+07-15 13:54:45.140  5339  5385 I BinderLab: C1 pid=5339 tid=5385 thread=BinderLab-handler-latency-blocked requestId=1001 atNs=122208829434520 result=3 costNs=1508698077
+07-15 13:54:45.141  5339  5385 I BinderLab: C_EXPERIMENT_CLIENT_DONE pid=5339 tid=5385 thread=BinderLab-handler-latency-blocked mode=handler-latency-blocked
