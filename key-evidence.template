@@ -1,0 +1,82 @@
+# BinderLab 关键证据
+
+本页由 `analyze-evidence.ps1` 从原始日志生成，只保留支撑正文主结论的必要 marker。完整 `threadtime` 日志用于审计，结构化判定见 [`analysis.json`](<analysis.json>)。PID、TID、requestId 和耗时只属于本次运行。
+
+<a id="binder-key-handler"></a>
+
+## 1. Handler baseline 与 blocked 对照
+
+baseline（run-01）：
+
+```text
+H0B requestId={{BASELINE_REQUEST_ID}} injectHandlerBlocker={{BASELINE_BLOCKER}} postCallNs={{BASELINE_POST_NS}}
+H1  requestId={{BASELINE_REQUEST_ID}} queueNs={{BASELINE_QUEUE_NS}}
+C1  requestId={{BASELINE_REQUEST_ID}} costNs={{BASELINE_COST_NS}}
+```
+
+blocked（run-01）：
+
+```text
+H0B requestId={{BLOCKED_REQUEST_ID}} injectHandlerBlocker={{BLOCKED_BLOCKER}} postCallNs={{BLOCKED_POST_NS}}
+H1  requestId={{BLOCKED_REQUEST_ID}} queueNs={{BLOCKED_QUEUE_NS}}
+C1  requestId={{BLOCKED_REQUEST_ID}} costNs={{BLOCKED_COST_NS}}
+```
+
+两组 `post()` 自身都很短；本轮 blocked 新增的约 1.5 秒主要落在 `H0B → H1`。五轮区间和阈值检查见[证据说明](<README.md#binder-evidence-results>)。
+
+<a id="binder-key-sync-reentry"></a>
+
+## 2. 同步嵌套与等待线程复用
+
+```text
+C_SYNC_CALL_BEGIN      requestId={{SYNC_REQUEST_ID}} tid={{SYNC_BEGIN_TID}} atNs=t0+{{SYNC_BEGIN_OFFSET_NS}}ns
+S_BEFORE_SYNC_CALLBACK requestId={{SYNC_BEFORE_REQUEST_ID}} atNs=t0+{{SYNC_BEFORE_OFFSET_NS}}ns
+C_SYNC_CALLBACK        requestId={{SYNC_CALLBACK_REQUEST_ID}} tid={{SYNC_CALLBACK_TID}} waitingTid={{SYNC_WAITING_TID}} atNs=t0+{{SYNC_CALLBACK_OFFSET_NS}}ns
+S_AFTER_SYNC_CALLBACK  requestId={{SYNC_AFTER_REQUEST_ID}} atNs=t0+{{SYNC_AFTER_OFFSET_NS}}ns
+C_SYNC_CALL_END        requestId={{SYNC_END_REQUEST_ID}} tid={{SYNC_END_TID}} atNs=t0+{{SYNC_END_OFFSET_NS}}ns
+```
+
+这里以 `C_SYNC_CALL_BEGIN.atNs` 为 `t0`；原始绝对值保留在完整日志和 `analysis.json`。相同 requestId、marker 与 `atNs` 双重严格嵌套顺序，以及 `callback TID = 外层等待 TID` 联合成立，因此只能表述为：**本次运行复用了原等待线程**。
+
+<a id="binder-key-node"></a>
+
+## 3. 不同 node 并发、同 node 内串行
+
+以下按“要证明的关系”分组，不表示完整日志顺序；并发 marker 在文本中的显示先后不参与结论。
+
+```text
+本节 `t0` 取下面展示时间点中的最早值；原始绝对值仍保留在完整日志和 `analysis.json`。
+
+提前提交：
+C_N1_CALL_RETURN(requestId={{N1_SECOND_REQUEST_ID}}).atNs=t0+{{N1_SECOND_RETURN_OFFSET_NS}}ns
+  < S_ASYNC_WORKER_EXIT(node=N1, requestId={{N1_FIRST_EXIT_REQUEST_ID}}).end=t0+{{N1_FIRST_EXIT_END_OFFSET_NS}}ns
+C_N2_CALL_RETURN(requestId={{N2_SECOND_REQUEST_ID}}).atNs=t0+{{N2_SECOND_RETURN_OFFSET_NS}}ns
+  < S_ASYNC_WORKER_EXIT(node=N2, requestId={{N2_FIRST_EXIT_REQUEST_ID}}).end=t0+{{N2_FIRST_EXIT_END_OFFSET_NS}}ns
+
+跨 node 重叠：
+N1[{{N1_FIRST_REQUEST_ID}}] = [t0+{{N1_FIRST_BEGIN_OFFSET_NS}}ns, t0+{{N1_FIRST_EXIT_END_OFFSET_NS}}ns), tid={{N1_FIRST_TID}}
+N2[{{N2_FIRST_REQUEST_ID}}] = [t0+{{N2_FIRST_BEGIN_OFFSET_NS}}ns, t0+{{N2_FIRST_EXIT_END_OFFSET_NS}}ns), tid={{N2_FIRST_TID}}
+overlap(N1[{{N1_FIRST_REQUEST_ID}}], N2[{{N2_FIRST_REQUEST_ID}}]) = {{FIRST_PAIR_OVERLAP_NS}} ns
+
+各 node 内串行：
+N1[{{N1_FIRST_EXIT_REQUEST_ID}}].end=t0+{{N1_FIRST_EXIT_END_OFFSET_NS}}ns
+  <= N1[{{N1_SECOND_ENTER_REQUEST_ID}}].begin=t0+{{N1_SECOND_ENTER_BEGIN_OFFSET_NS}}ns
+N2[{{N2_FIRST_EXIT_REQUEST_ID}}].end=t0+{{N2_FIRST_EXIT_END_OFFSET_NS}}ns
+  <= N2[{{N2_SECOND_ENTER_REQUEST_ID}}].begin=t0+{{N2_SECOND_ENTER_BEGIN_OFFSET_NS}}ns
+```
+
+两条第二笔调用均在各自第一笔退出前完成提交；N1/N2 的第一笔在不同 Binder TID 上形成显著正重叠，而每个 node 的第二笔都在第一笔退出后才进入。
+
+<a id="binder-key-death"></a>
+
+## 4. 死亡通知与 generation 切换
+
+```text
+C_LAST_SUCCESS_END requestId={{LAST_SUCCESS_REQUEST_ID}} result={{LAST_SUCCESS_RESULT}}
+C_GENERATION_INVALID connectionEpoch={{INVALID_CONNECTION_EPOCH}} generationId={{INVALID_GENERATION_ID}} oldState={{INVALID_OLD_STATE}} wasCurrent={{INVALID_WAS_CURRENT}} reason={{INVALID_REASON}}
+C_OLD_PROXY_DEAD_OBJECT generationId={{DEAD_OBJECT_GENERATION_ID}} exception={{DEAD_OBJECT_EXCEPTION}}
+C_GENERATION_STATE connectionEpoch={{SECOND_CONNECTION_EPOCH}} generationId={{SECOND_GENERATION_ID}} newState=ACTIVE
+C_EXPERIMENT_NOT_RESTARTED generationId={{NOT_RESTARTED_GENERATION_ID}}
+```
+
+本轮准确顺序是：`T1 最后成功 → T3 binderDied → 受控 T2 旧代理探测失败 → T4 显式 rebind 发布 generation 2`。这是实验代码主动安排的观测顺序，**不是平台保证 T3 永远早于自然发生的 T2**。分析器还要求 ACTIVE 恰好两次、generationId/connectionEpoch 都是 `1 → 2`，且新代恰好一次记录 `C_EXPERIMENT_NOT_RESTARTED`。

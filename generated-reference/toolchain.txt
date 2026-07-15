@@ -1,0 +1,10 @@
+sdkPlatform=android-36.1
+sdkPlatformRevision=1
+sdkApiLevel=36.1
+compileSdk=36.1
+targetSdk=36
+minSdk=26
+buildTools=36.0.0
+aidlPackage=36.0.0
+aidlBanner=AIDL Compiler: built for platform SDK version 36
+aidlArguments=--lang=java --min_sdk_version=26 --omit_invocation -Werror

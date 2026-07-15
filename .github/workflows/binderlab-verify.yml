@@ -1,0 +1,77 @@
+name: BinderLab verify
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Android 16 QPR2 toolchain
+        shell: pwsh
+        run: |
+          $sdkRoot = if ($env:ANDROID_SDK_ROOT) {
+            $env:ANDROID_SDK_ROOT
+          } else {
+            $env:ANDROID_HOME
+          }
+          if (-not $sdkRoot) {
+            throw "ANDROID_SDK_ROOT and ANDROID_HOME are both empty"
+          }
+          $sdkManager = Get-ChildItem `
+            -LiteralPath (Join-Path $sdkRoot "cmdline-tools") `
+            -Recurse `
+            -Filter sdkmanager.bat | Select-Object -First 1
+          if (-not $sdkManager) {
+            throw "sdkmanager.bat was not found under $sdkRoot"
+          }
+          $answers = 1..20 | ForEach-Object { "y" }
+          $answers | & $sdkManager.FullName `
+            --sdk_root=$sdkRoot `
+            "platforms;android-36.1" `
+            "build-tools;36.0.0"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Android SDK package installation failed"
+          }
+          "ANDROID_SDK_ROOT=$sdkRoot" >> $env:GITHUB_ENV
+
+      - name: Build and verify BinderLab
+        shell: pwsh
+        run: |
+          $verifyArgs = @{
+            SdkRoot = $env:ANDROID_SDK_ROOT
+            CompileSdkPlatform = "36.1"
+            BuildToolsVersion = "36.0.0"
+          }
+          if ("${{ github.event_name }}" -eq "push") {
+            $verifyArgs.DiffBase = "${{ github.event.before }}"
+          }
+          .\verify.ps1 @verifyArgs
+
+      - name: Upload reproducibility artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BinderLab-api36.1-verification
+          if-no-files-found: warn
+          path: |
+            build/BinderLab-debug.apk
+            build/apk-badging.txt
+            build/toolchain.txt
+            build/analysis.verify.json
+            build/generated/**/*.java
