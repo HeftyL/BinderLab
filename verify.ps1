@@ -344,8 +344,17 @@ $committedAnalysisGeneratedAt = Get-JsonPlainStringProperty `
     -Json $committedAnalysisJson `
     -PropertyName "generatedAt" `
     -Description "analysis.generatedAt"
-$committedAnalysis = $committedAnalysisJson | ConvertFrom-Json
-$freshAnalysis = $freshAnalysisJson | ConvertFrom-Json
+if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey("DateKind")) {
+    $committedAnalysis = ConvertFrom-Json `
+        -InputObject $committedAnalysisJson `
+        -DateKind String
+    $freshAnalysis = ConvertFrom-Json `
+        -InputObject $freshAnalysisJson `
+        -DateKind String
+} else {
+    $committedAnalysis = $committedAnalysisJson | ConvertFrom-Json
+    $freshAnalysis = $freshAnalysisJson | ConvertFrom-Json
+}
 $committedPropertyNames = @($committedAnalysis.PSObject.Properties.Name)
 $committedLegacyCapture = $committedPropertyNames -notcontains "analysisMode" `
     -and [int]$committedAnalysis.schemaVersion -eq 6

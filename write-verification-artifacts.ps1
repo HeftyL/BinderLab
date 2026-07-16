@@ -75,10 +75,17 @@ foreach ($relativePath in $requiredRelativePaths) {
     }
 }
 
-$replayReport = Get-Content `
+$replayReportJson = Get-Content `
     -LiteralPath (Join-Path $buildPath "evidence-replay-report.json") `
     -Raw `
-    -Encoding UTF8 | ConvertFrom-Json
+    -Encoding UTF8
+if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey("DateKind")) {
+    $replayReport = ConvertFrom-Json `
+        -InputObject $replayReportJson `
+        -DateKind String
+} else {
+    $replayReport = $replayReportJson | ConvertFrom-Json
+}
 if ($replayReport.analysisMode -cne "replay" -or
         -not $replayReport.allRequiredChecksPassed -or
         $replayReport.originalAnalysisSha256 -notmatch '^[0-9a-f]{64}$') {

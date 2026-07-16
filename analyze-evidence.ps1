@@ -67,7 +67,16 @@ if ($AnalysisMode -eq "Replay") {
         -LiteralPath $SourceAnalysisPath `
         -Raw `
         -Encoding UTF8
-    $sourceAnalysis = $sourceAnalysisJson | ConvertFrom-Json
+    # PowerShell 7.5+ may deserialize ISO-8601 strings as DateTime values by
+    # default. Preserve the original JSON text so capture/replay timestamps and
+    # their hashes have identical semantics on Windows PowerShell and pwsh.
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey("DateKind")) {
+        $sourceAnalysis = ConvertFrom-Json `
+            -InputObject $sourceAnalysisJson `
+            -DateKind String
+    } else {
+        $sourceAnalysis = $sourceAnalysisJson | ConvertFrom-Json
+    }
     $sourcePropertyNames = @($sourceAnalysis.PSObject.Properties.Name)
     if ($sourceAnalysis.captureId -cne $CaptureId -or
             $sourceAnalysis.captureStartedAt -cne $CaptureStartedAt) {
