@@ -306,8 +306,9 @@ foreach ($metadataPattern in @(
     "verify", "--verbose", $apk
 ))
 
-$freshAnalysisPath = Join-Path $projectRoot "build\analysis.verify.json"
-$freshKeyEvidencePath = Join-Path $projectRoot "build\key-evidence.verify.md"
+$freshAnalysisPath = Join-Path $projectRoot "build\evidence-replay-report.json"
+$freshKeyEvidencePath = Join-Path $projectRoot "build\key-evidence.replay.md"
+$committedAnalysisPath = Join-Path $evidenceRoot "analysis.json"
 $analysisSourceInfo = Read-KeyValueFile -Path (Join-Path $evidenceRoot "source.txt")
 foreach ($captureKey in @("captureId", "captureStartedAt")) {
     if (-not $analysisSourceInfo.Contains($captureKey) -or
@@ -320,9 +321,11 @@ foreach ($captureKey in @("captureId", "captureStartedAt")) {
     -OutputPath $freshAnalysisPath `
     -KeyEvidencePath $freshKeyEvidencePath `
     -CaptureId $analysisSourceInfo.captureId `
-    -CaptureStartedAt $analysisSourceInfo.captureStartedAt | Out-Null
+    -CaptureStartedAt $analysisSourceInfo.captureStartedAt `
+    -AnalysisMode Replay `
+    -SourceAnalysisPath $committedAnalysisPath | Out-Null
 $committedAnalysisJson = Get-Content `
-    -LiteralPath (Join-Path $evidenceRoot "analysis.json") `
+    -LiteralPath $committedAnalysisPath `
     -Raw `
     -Encoding UTF8
 $freshAnalysisJson = Get-Content `
@@ -343,10 +346,64 @@ $committedAnalysisGeneratedAt = Get-JsonPlainStringProperty `
     -Description "analysis.generatedAt"
 $committedAnalysis = $committedAnalysisJson | ConvertFrom-Json
 $freshAnalysis = $freshAnalysisJson | ConvertFrom-Json
-$freshAnalysis.generatedAt = $committedAnalysis.generatedAt
-$committedJson = $committedAnalysis | ConvertTo-Json -Depth 12 -Compress
-$freshJson = $freshAnalysis | ConvertTo-Json -Depth 12 -Compress
-if ($committedJson -ne $freshJson) {
+$committedPropertyNames = @($committedAnalysis.PSObject.Properties.Name)
+$committedLegacyCapture = $committedPropertyNames -notcontains "analysisMode" `
+    -and [int]$committedAnalysis.schemaVersion -eq 6
+if (-not $committedLegacyCapture -and $committedAnalysis.analysisMode -cne "capture") {
+    throw "Committed evidence analysis must have analysisMode=capture"
+}
+$expectedAnalysisHash = (Get-FileHash `
+    -LiteralPath $committedAnalysisPath `
+    -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($freshAnalysis.analysisMode -cne "replay" -or
+        $freshAnalysis.originalAnalysisSha256 -cne $expectedAnalysisHash -or
+        $freshAnalysis.sourceAnalysisGeneratedAt -cne $committedAnalysis.generatedAt -or
+        $freshAnalysis.captureId -cne $committedAnalysis.captureId -or
+        $freshAnalysis.captureStartedAt -cne $committedAnalysis.captureStartedAt) {
+    throw "Replay report provenance does not match committed evidence/analysis.json"
+}
+if ($committedLegacyCapture) {
+    foreach ($propertyName in @(
+            "fullMarkerOrder",
+            "atNsAvailable",
+            "atNsCoverage",
+            "atNsExpected",
+            "strictlyIncreasingAtNs",
+            "atNs"
+        )) {
+        [void]$freshAnalysis.asyncCallback.PSObject.Properties.Remove($propertyName)
+    }
+    foreach ($propertyName in @(
+            "atNsAvailable",
+            "atNsCoverage",
+            "atNsExpected",
+            "strictlyIncreasingAtNs",
+            "atNs"
+        )) {
+        [void]$freshAnalysis.binderDeath.PSObject.Properties.Remove($propertyName)
+    }
+}
+$analysisResultProperties = @(
+    "evidenceDirectory",
+    "handlerLatencyBaseline",
+    "handlerLatencyBlocked",
+    "handlerLatencyComparison",
+    "syncReentry",
+    "onewaySameNode",
+    "onewayCrossNode",
+    "asyncCallback",
+    "binderDeath",
+    "allRequiredChecksPassed"
+)
+$committedResults = [ordered]@{}
+$freshResults = [ordered]@{}
+foreach ($propertyName in $analysisResultProperties) {
+    $committedResults[$propertyName] = $committedAnalysis.$propertyName
+    $freshResults[$propertyName] = $freshAnalysis.$propertyName
+}
+$committedJson = $committedResults | ConvertTo-Json -Depth 12 -Compress
+$freshJson = $freshResults | ConvertTo-Json -Depth 12 -Compress
+if ($committedJson -cne $freshJson) {
     throw "Committed evidence/analysis.json drifted from raw logs"
 }
 $committedKeyEvidencePath = Join-Path $evidenceRoot "key-evidence.md"
@@ -501,20 +558,51 @@ foreach ($line in Get-Content -LiteralPath $sourceManifestPath -Encoding UTF8) {
     }
     $recordedSourceEntries[$Matches.path] = $Matches.hash
 }
-$currentSourceEntries = [ordered]@{}
-foreach ($entry in & (Join-Path $projectRoot "source-manifest.ps1") `
-        -ProjectRoot $projectRoot) {
-    $currentSourceEntries[$entry.Path] = $entry.Hash
+function Get-GitBlobSha256 {
+    param(
+        [string]$Repository,
+        [string]$ObjectSpec
+    )
+
+    if ($ObjectSpec -match '["\r\n]') {
+        throw "Unsupported git object spec: $ObjectSpec"
+    }
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "git"
+    $startInfo.Arguments = "-C `"$Repository`" cat-file blob `"$ObjectSpec`""
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $memory = New-Object System.IO.MemoryStream
+    $process.StandardOutput.BaseStream.CopyTo($memory)
+    $errorText = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        throw "Could not read evidence source blob ${ObjectSpec}: $errorText"
+    }
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return (($sha256.ComputeHash($memory.ToArray()) | ForEach-Object {
+            $_.ToString("x2")
+        }) -join '')
+    } finally {
+        $sha256.Dispose()
+        $memory.Dispose()
+        $process.Dispose()
+    }
 }
-Assert-MapEqual `
-    -Actual $currentSourceEntries `
-    -Expected $recordedSourceEntries `
-    -Description "Evidence source manifest"
-$sourcePathsAtRecordedCommit = @($recordedSourceEntries.Keys |
-    ForEach-Object { [string]$_ })
-& git -C $gitRoot diff --quiet $sourceInfo.gitCommit -- @sourcePathsAtRecordedCommit
-if ($LASTEXITCODE -ne 0) {
-    throw "Evidence source inputs differ from the recorded clean commit $($sourceInfo.gitCommit)"
+foreach ($recordedPath in $recordedSourceEntries.Keys) {
+    $objectSpec = "$($sourceInfo.gitCommit):$recordedPath"
+    $commitHash = Get-GitBlobSha256 `
+        -Repository $gitRoot `
+        -ObjectSpec $objectSpec
+    if ($commitHash -cne $recordedSourceEntries[$recordedPath]) {
+        throw "Evidence source hash does not match recorded commit for $recordedPath"
+    }
 }
 
 $evidenceBadging = Get-Content `
@@ -610,13 +698,33 @@ if (-not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) {
 $workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
 foreach ($requiredWorkflowText in @(
     'build/BinderLab-debug.apk',
+    'build/evidence-replay-report.json',
+    'build/verification-provenance.txt',
+    'build/artifact-manifest.sha256',
     'platforms;android-36.1',
     'CompileSdkPlatform = "36.1"',
     'github.event.before',
-    '$verifyArgs.DiffBase = "${{ github.event.before }}"'
+    '$verifyArgs.DiffBase = "${{ github.event.before }}"',
+    'statuses: write',
+    'contents: write',
+    'state = "pending"',
+    'always() && github.event_name == ''push''',
+    'binderlab/standalone-verification',
+    'if-no-files-found: error',
+    '.\write-verification-artifacts.ps1',
+    'Publish annotated v1.1 release tag once',
+    'published tags must not move'
 )) {
     if ($workflowContent -notmatch [regex]::Escape($requiredWorkflowText)) {
         throw "Repository-root workflow is missing: $requiredWorkflowText"
+    }
+}
+foreach ($forbiddenWorkflowText in @(
+        'if-no-files-found: warn',
+        'build/analysis.verify.json'
+    )) {
+    if ($workflowContent.Contains($forbiddenWorkflowText)) {
+        throw "Repository-root workflow still contains: $forbiddenWorkflowText"
     }
 }
 

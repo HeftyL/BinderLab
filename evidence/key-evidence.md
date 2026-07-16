@@ -74,7 +74,7 @@ N2[1003].end=t0+706861231ns
 ```text
 C_LAST_SUCCESS_END requestId=1001 result=42
 C_GENERATION_INVALID connectionEpoch=1 generationId=1 oldState=ACTIVE wasCurrent=true reason=binderDied
-C_OLD_PROXY_DEAD_OBJECT generationId=1 exception=DeadObjectException
+C_OLD_PROXY_DEAD_OBJECT connectionEpoch=1 generationId=1 requestId=1002 exception=DeadObjectException
 C_GENERATION_STATE connectionEpoch=2 generationId=2 newState=ACTIVE
 C_EXPERIMENT_NOT_RESTARTED generationId=2
 ```

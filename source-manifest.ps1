@@ -29,7 +29,8 @@ foreach ($relativePath in @(
     "analyze-evidence.ps1",
     "key-evidence.template",
     "source-manifest.ps1",
-    "verify.ps1"
+    "verify.ps1",
+    "write-verification-artifacts.ps1"
 )) {
     $fullPath = Join-Path $root $relativePath
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {

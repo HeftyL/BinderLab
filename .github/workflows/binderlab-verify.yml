@@ -5,7 +5,8 @@ on:
   push:
 
 permissions:
-  contents: read
+  contents: write
+  statuses: write
 
 jobs:
   verify:
@@ -16,6 +17,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Publish pending standalone status
+        if: ${{ github.event_name == 'push' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $body = @{
+            state = "pending"
+            target_url = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            description = "BinderLab standalone verification is running"
+            context = "binderlab/standalone-verification"
+          } | ConvertTo-Json
+          Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" `
+            -Headers $headers `
+            -Body $body `
+            -ContentType "application/json" | Out-Null
 
       - uses: actions/setup-java@v4
         with:
@@ -71,15 +96,106 @@ jobs:
           }
           .\verify.ps1 @verifyArgs
 
+      - name: Validate and describe artifact contents
+        shell: pwsh
+        run: |
+          $tag = (& git describe --tags --exact-match HEAD 2>$null | Select-Object -First 1)
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = "unreleased"
+          }
+          $sourceCommitLines = @(Get-Content .\evidence\source.txt |
+            Where-Object { $_ -match '^gitCommit=[0-9a-f]{40}$' })
+          if ($sourceCommitLines.Count -ne 1) {
+            throw "evidence/source.txt must contain exactly one gitCommit"
+          }
+          $sourceCommit = $sourceCommitLines[0].Substring('gitCommit='.Length)
+          .\write-verification-artifacts.ps1 `
+            -ProducerRepository "${{ github.repository }}" `
+            -ProducerCommit "${{ github.sha }}" `
+            -BinderLabTag $tag `
+            -BinderLabCommit "${{ github.sha }}" `
+            -EvidenceSourceCommit $sourceCommit `
+            -WorkflowRunId "${{ github.run_id }}" `
+            -WorkflowRunAttempt "${{ github.run_attempt }}"
+
       - name: Upload reproducibility artifacts
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: BinderLab-api36.1-verification
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             build/BinderLab-debug.apk
             build/apk-badging.txt
             build/toolchain.txt
-            build/analysis.verify.json
-            build/generated/**/*.java
+            build/evidence-replay-report.json
+            build/generated/com/example/binderdemo/IAsyncWorker.java
+            build/generated/com/example/binderdemo/ICalculator.java
+            build/generated/com/example/binderdemo/IResultCallback.java
+            build/generated/com/example/binderdemo/ISyncResultCallback.java
+            build/verification-provenance.txt
+            build/artifact-manifest.sha256
+
+      - name: Publish annotated v1.1 release tag once
+        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'publish BinderLab evidence v1.1' }}
+        shell: pwsh
+        env:
+          RELEASE_TAG: android16-qpr2-evidence-v1.1
+        run: |
+          & git fetch origin "refs/tags/${env:RELEASE_TAG}:refs/tags/${env:RELEASE_TAG}" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $existing = (& git rev-list -n 1 "refs/tags/$env:RELEASE_TAG").Trim()
+            if ($existing -ne $env:GITHUB_SHA) {
+              throw "$env:RELEASE_TAG already exists at $existing; published tags must not move"
+            }
+            if ((& git cat-file -t "refs/tags/$env:RELEASE_TAG").Trim() -ne "tag") {
+              throw "$env:RELEASE_TAG exists but is not an annotated tag"
+            }
+            Write-Host "$env:RELEASE_TAG already points to this release commit"
+            exit 0
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a $env:RELEASE_TAG -m "Android 16 QPR2 BinderLab evidence v1.1" $env:GITHUB_SHA
+          git push origin "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not publish annotated tag $env:RELEASE_TAG"
+          }
+
+      - name: Publish final standalone status
+        if: ${{ always() && github.event_name == 'push' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          $state = switch ($env:JOB_STATUS) {
+            "success" { "success" }
+            "cancelled" { "error" }
+            default { "failure" }
+          }
+          $description = switch ($state) {
+            "success" { "SDK 36.1, evidence replay, build, and artifacts passed" }
+            "error" { "BinderLab standalone verification was cancelled" }
+            default { "BinderLab standalone verification failed" }
+          }
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $body = @{
+            state = $state
+            target_url = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            description = $description
+            context = "binderlab/standalone-verification"
+          } | ConvertTo-Json
+          $status = Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" `
+            -Headers $headers `
+            -Body $body `
+            -ContentType "application/json"
+          if ($status.state -ne $state -or
+              $status.context -ne "binderlab/standalone-verification") {
+            throw "GitHub did not persist the expected standalone status"
+          }

@@ -40,7 +40,7 @@
 
 本次 [`source.txt`](<source.txt>) 必须记录 `gitDirty=false`。`verify.ps1` 不只复算当前源码清单，还会把这些输入与 `gitCommit` 指向的 clean commit 比较；因此读者可以直接 checkout 该提交取得产生 APK 和日志的实验源码。`source-manifest.sha256` 与 APK SHA-256 继续保留，用于检测后续源码漂移和绑定本次设备实际安装的 APK。
 
-本轮有意在“提交 A”的 detached HEAD 上采集，所以 `gitBranch=detached` 是可复现流程的结果，不代表来源不明：采集期间没有可移动的分支指针，身份由完整 `gitCommit`、`gitDirty=false` 和逐文件源码清单共同绑定。采集身份还要求 `source.txt`、`device.txt`、`analysis.json` 三者的 captureId 与开始时间分别相等，并严格满足 `captureStartedAt < analysis.generatedAt < captureCompletedAt`；这样来源、设备 metadata、分析结果和同一轮目录发布才形成直接的可机检绑定。
+本轮有意在“提交 A”的 detached HEAD 上采集，所以 `gitBranch=detached` 是可复现流程的结果，不代表来源不明：采集期间没有可移动的分支指针，身份由完整 `gitCommit`、`gitDirty=false` 和逐文件源码清单共同绑定。采集身份还要求 `source.txt`、`device.txt`、`analysis.json` 三者的 captureId 与开始时间分别相等，并严格满足 `captureStartedAt < analysis.generatedAt < captureCompletedAt`；这样来源、设备 metadata、分析结果和同一轮目录发布才形成直接的可机检绑定。封存的 `analysis.json` 保留本轮 capture 时间语义；后续 CI 重放使用独立的 `evidence-replay-report.json`，显式记录原分析 SHA-256、原 `generatedAt` 和本次 `replayedAt`，不会改写或冒充原分析时间。
 
 <a id="binder-evidence-results"></a>
 

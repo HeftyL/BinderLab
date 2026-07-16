@@ -424,7 +424,8 @@ try {
         -EvidenceDir $stagingDir `
         -OutputPath (Join-Path $stagingDir "analysis.json") `
         -CaptureId $captureId `
-        -CaptureStartedAt ($captureStartedAt.ToString("o")) | Out-Null
+        -CaptureStartedAt ($captureStartedAt.ToString("o")) `
+        -AnalysisMode Capture | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Evidence analysis failed"
     }
@@ -448,6 +449,10 @@ try {
         -Json $analysisJson `
         -PropertyName "captureId" `
         -Description "analysis.captureId"
+    $analysisMode = Get-JsonPlainStringProperty `
+        -Json $analysisJson `
+        -PropertyName "analysisMode" `
+        -Description "analysis.analysisMode"
     $analysisCaptureStartedAt = Get-JsonPlainStringProperty `
         -Json $analysisJson `
         -PropertyName "captureStartedAt" `
@@ -465,7 +470,8 @@ try {
     } catch {
         throw "analysis.generatedAt is not a round-trip ISO-8601 timestamp: $analysisGeneratedAtText"
     }
-    if ($analysisCaptureId -cne $captureId -or
+    if ($analysisMode -cne "capture" -or
+            $analysisCaptureId -cne $captureId -or
             $analysisCaptureStartedAt -cne $captureStartedAt.ToString("o")) {
         throw "analysis capture metadata does not match the active capture"
     }

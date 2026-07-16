@@ -9,7 +9,15 @@ git clone https://github.com/HeftyL/BinderLab.git
 cd .\BinderLab
 ```
 
-本轮已审核证据固定在 tag `android16-qpr2-evidence-v1`（commit `b34b765d6793598004a52594c65d7f5839832a7c`）。`main` 保留为最新开发线；需要复核本轮证据时应 checkout 该 tag，不能把可移动的 `main` 当作历史证据版本。
+本轮已审核证据的修订发布版固定在 tag `android16-qpr2-evidence-v1.1`。该 tag 保留 v1 的原始真机日志和实验结论，只修订公共克隆/checkout 说明、CI/replay provenance、关键摘要字段和后续采集的单调时钟埋点；旧 `android16-qpr2-evidence-v1` 仍保留在原 commit，不会重指向。`main` 是最新开发线，不能替代发布 tag：
+
+```powershell
+git checkout --detach android16-qpr2-evidence-v1.1
+git cat-file -t refs/tags/android16-qpr2-evidence-v1.1  # 应输出 tag，而不是 commit
+git rev-list -n 1 refs/tags/android16-qpr2-evidence-v1.1
+```
+
+这里的“固定发布 tag”表示发布策略要求不得移动；annotated tag 仍是 Git ref。若仓库规则尚未禁止更新/删除匹配 tag，文档和脚本只能证明当前解析结果一致，不能承诺未来权限持有者绝对无法移动它。
 
 当前基线：
 
@@ -126,7 +134,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 | `async-callback` | `C_ASYNC_CALLBACK_OBSERVED` |
 | `binder-death` | 旧代失效、旧代理 DeadObjectException、新代 ACTIVE，且新代出现 `C_EXPERIMENT_NOT_RESTARTED` |
 
-默认日志写入被忽略的 `build/run-logs/`。要重新生成仓库证据包，必须先提交所有仓库改动，再运行 `collect-evidence.ps1`；公开采集要求工作区 clean，并且固定重新构建 APK，`-SkipBuild` 会直接失败。脚本在构建前冻结源码清单，在分析后和正式发布前再次核对清单与 Git HEAD，并先在 capture 专属 staging 收集固定文件集合。只有分析、公开信息去标识和来源稳定性全部通过，才通过“旧目录移到 backup、staging 移到正式目录、失败回滚”的事务式目录发布替换 `evidence/`。启动时若发现残留 staging/backup 会中止并要求人工恢复，避免覆盖崩溃现场；正常异常也不会把本轮部分日志混入上一轮证据。完整命令、源码绑定和采集元数据分别保存在 [`commands.txt`](<evidence/commands.txt>)、[`source.txt`](<evidence/source.txt>)与 [`source-manifest.sha256`](<evidence/source-manifest.sha256>)；源码清单使用仓库相对路径，并把仓库根 `.gitattributes` 也纳入哈希。[`evidence-manifest.sha256`](<evidence/evidence-manifest.sha256>)再覆盖证据目录中除自身外的每个文件。校验器要求 `source.txt`、`device.txt` 和 `analysis.json` 三者的 captureId / 开始时间完全一致，并满足 `captureStartedAt < analysis.generatedAt < captureCompletedAt`。
+默认日志写入被忽略的 `build/run-logs/`。要重新生成仓库证据包，必须先提交所有仓库改动，再运行 `collect-evidence.ps1`；公开采集要求工作区 clean，并且固定重新构建 APK，`-SkipBuild` 会直接失败。脚本在构建前冻结源码清单，在分析后和正式发布前再次核对清单与 Git HEAD，并先在 capture 专属 staging 收集固定文件集合。只有分析、公开信息去标识和来源稳定性全部通过，才通过“旧目录移到 backup、staging 移到正式目录、失败回滚”的事务式目录发布替换 `evidence/`。启动时若发现残留 staging/backup 会中止并要求人工恢复，避免覆盖崩溃现场；正常异常也不会把本轮部分日志混入上一轮证据。完整命令、源码绑定和采集元数据分别保存在 [`commands.txt`](<evidence/commands.txt>)、[`source.txt`](<evidence/source.txt>)与 [`source-manifest.sha256`](<evidence/source-manifest.sha256>)；源码清单使用仓库相对路径，并把仓库根 `.gitattributes` 也纳入哈希。[`evidence-manifest.sha256`](<evidence/evidence-manifest.sha256>)再覆盖证据目录中除自身外的每个文件。校验器要求 `source.txt`、`device.txt` 和 `analysis.json` 三者的 captureId / 开始时间完全一致，并满足 `captureStartedAt < analysis.generatedAt < captureCompletedAt`。封存的 `analysis.json` 只表达采集期间的 capture 分析；CI 重新分析写入 `build/evidence-replay-report.json`，使用 `analysisMode=replay`、`originalAnalysisSha256`、`sourceAnalysisGeneratedAt` 和本次 `replayedAt`，不能把 replay 时间解释成原证据分析时间。
 
 ## 五、每组实验怎样判定
 
@@ -270,6 +278,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\verify.ps1
 ```
 
-校验器会以 SDK Platform 36.1、Build Tools / AIDL 36.0.0 重新构建，并检查四个 AIDL 接口、oneway flags、callback / 返回 Binder 引用、生成物 SHA-256、APK SDK 元数据和签名、证据日志重算、关键证据页、clean commit 绑定、公开设备信息去标识、仓库根 workflow、Markdown 链接/围栏、公开链接边界、旧版本残留和 Git whitespace。仓库根 `.gitattributes` 把文本固定为 LF；源码清单把它和全部构建、采集、分析输入写成仓库相对路径。
+校验器会以 SDK Platform 36.1、Build Tools / AIDL 36.0.0 重新构建，并检查四个 AIDL 接口、oneway flags、callback / 返回 Binder 引用、生成物 SHA-256、APK SDK 元数据和签名、证据日志重算、关键证据页、clean commit 绑定、公开设备信息去标识、仓库根 workflow、Markdown 链接/围栏、公开链接边界、旧版本残留和 Git whitespace。仓库根 `.gitattributes` 把文本固定为 LF；源码清单把它和全部构建、采集、分析输入写成仓库相对路径。CI 在每次 push 开始先把 `binderlab/standalone-verification` 写成 pending，结束时无论成功、失败还是取消都覆盖最终状态；artifact 缺少任一 APK、metadata、replay report 或四个 AIDL Java 文件都会失败。ZIP 内的 `verification-provenance.txt` 和 `artifact-manifest.sha256` 让文件离开 Actions 页面后仍能核对 commit、run、SDK、Java 与逐文件 SHA-256。
 
 BinderLab 不依赖任何外部文章仓库或私有文档路径；需要引用这些实验的文章应单向链接本公共仓库。真机采集仍只在有设备的环境执行。网络内容与证据语义仍需人工复核，脚本通过不等于技术结论自动正确。

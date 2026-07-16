@@ -3,7 +3,10 @@ param(
     [string]$OutputPath = (Join-Path $EvidenceDir "analysis.json"),
     [string]$KeyEvidencePath,
     [string]$CaptureId,
-    [string]$CaptureStartedAt
+    [string]$CaptureStartedAt,
+    [ValidateSet("Capture", "Replay")]
+    [string]$AnalysisMode = "Capture",
+    [string]$SourceAnalysisPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,6 +53,49 @@ try {
 } catch {
     throw "CaptureStartedAt is not a round-trip ISO-8601 timestamp: $CaptureStartedAt"
 }
+
+$sourceAnalysis = $null
+$sourceAnalysisGeneratedAt = $null
+$originalAnalysisSha256 = $null
+$legacyCaptureReplay = $false
+if ($AnalysisMode -eq "Replay") {
+    if ([string]::IsNullOrWhiteSpace($SourceAnalysisPath) -or
+            -not (Test-Path -LiteralPath $SourceAnalysisPath -PathType Leaf)) {
+        throw "Replay analysis requires an existing SourceAnalysisPath"
+    }
+    $sourceAnalysisJson = Get-Content `
+        -LiteralPath $SourceAnalysisPath `
+        -Raw `
+        -Encoding UTF8
+    $sourceAnalysis = $sourceAnalysisJson | ConvertFrom-Json
+    $sourcePropertyNames = @($sourceAnalysis.PSObject.Properties.Name)
+    if ($sourceAnalysis.captureId -cne $CaptureId -or
+            $sourceAnalysis.captureStartedAt -cne $CaptureStartedAt) {
+        throw "Replay capture identity does not match the source analysis"
+    }
+    if ($sourcePropertyNames -notcontains "generatedAt") {
+        throw "Source analysis has no capture-time generatedAt"
+    }
+    $legacyCaptureReplay = $sourcePropertyNames -notcontains "analysisMode" `
+        -and [int]$sourceAnalysis.schemaVersion -eq 6
+    if (-not $legacyCaptureReplay -and $sourceAnalysis.analysisMode -cne "capture") {
+        throw "Source analysis must have analysisMode=capture"
+    }
+    $sourceAnalysisGeneratedAt = [string]$sourceAnalysis.generatedAt
+    try {
+        [void][DateTimeOffset]::ParseExact(
+            $sourceAnalysisGeneratedAt,
+            "o",
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::None)
+    } catch {
+        throw "Source analysis generatedAt is not a round-trip ISO-8601 timestamp"
+    }
+    $originalAnalysisSha256 = (Get-FileHash `
+        -LiteralPath $SourceAnalysisPath `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+$requireExtendedAtNs = $AnalysisMode -eq "Capture" -or -not $legacyCaptureReplay
 
 function Read-Events {
     param([string]$Path)
@@ -158,6 +204,44 @@ function Test-MarkerOrder {
         }
     }
     return $true
+}
+
+function Get-EventAtNsCheck {
+    param(
+        [object[]]$Events,
+        [bool]$Required
+    )
+
+    $values = New-Object System.Collections.Generic.List[long]
+    foreach ($event in $Events) {
+        if (-not $event.Fields.Contains("atNs")) {
+            if ($Required) {
+                throw "Event $($event.Marker) has no atNs field: $($event.Raw)"
+            }
+            return [ordered]@{
+                available = $false
+                coverage = $values.Count
+                expected = $Events.Count
+                strictlyIncreasing = $null
+                values = @($values)
+            }
+        }
+        $values.Add([long](Get-Field -Event $event -Name "atNs"))
+    }
+    $strictlyIncreasing = $true
+    for ($i = 1; $i -lt $values.Count; $i++) {
+        if ($values[$i] -le $values[$i - 1]) {
+            $strictlyIncreasing = $false
+            break
+        }
+    }
+    return [ordered]@{
+        available = $true
+        coverage = $values.Count
+        expected = $Events.Count
+        strictlyIncreasing = $strictlyIncreasing
+        values = @($values)
+    }
 }
 
 function Get-Intervals {
@@ -784,9 +868,21 @@ $asyncTopologyPassed = $asyncClientPids.Count -eq 1 `
     -and $asyncCallbackPid -eq $asyncClientPids[0] `
     -and $asyncCallbackTid -ne $asyncClientTids[0] `
     -and $asyncServerPostTid -ne $asyncServerRunTid
+$asyncTimelineEvents = @(
+    $asyncBegin,
+    $asyncReturn,
+    $asyncServerPost,
+    $asyncServerRun,
+    $asyncCallback,
+    $asyncObserved
+)
+$asyncAtNs = Get-EventAtNsCheck `
+    -Events $asyncTimelineEvents `
+    -Required $requireExtendedAtNs
 $async = [ordered]@{
     requestId = [int]$asyncRequestIds[0]
     sameRequestId = $asyncRequestIds.Count -eq 1
+    fullMarkerOrder = Test-MarkerOrder -Events $asyncEvents -Markers $asyncMarkers
     serverToCallbackOrder = Test-MarkerOrder -Events $asyncEvents -Markers $asyncServerChain
     requestIdsMatchIndependently = $asyncRequestIds.Count -eq 1
     selfReportedRequestMatches = (Get-Field `
@@ -822,6 +918,11 @@ $async = [ordered]@{
     callbackThreadNameConsistentWithBinderPool = `
         $asyncCallbackThreadNameConsistentWithBinderPool
     topologyPassed = $asyncTopologyPassed
+    atNsAvailable = $asyncAtNs.available
+    atNsCoverage = $asyncAtNs.coverage
+    atNsExpected = $asyncAtNs.expected
+    strictlyIncreasingAtNs = $asyncAtNs.strictlyIncreasing
+    atNs = $asyncAtNs.values
     calculatorClass = Get-Field -Event $connectedActive -Name "calculatorClass"
     calculatorBinderClass = Get-Field `
         -Event $connectedActive `
@@ -912,6 +1013,23 @@ $deathLifecycleOrder = $exactlyTwoActiveGenerations `
     -and $deadObjectEvent.Index -lt $testRebindEvent.Index `
     -and $testRebindEvent.Index -lt $activeEvents[-1].Index `
     -and $activeEvents[-1].Index -lt $experimentNotRestarted.Index
+$deathTimelineEvents = @(
+    $activeEvents[0],
+    $lastSuccessBegin,
+    $lastSuccessServerS0[0],
+    $lastSuccessServerS1[0],
+    $lastSuccessEnd,
+    $deathArmed,
+    $invalidEvent,
+    $deadObjectEvent,
+    $testRebindEvent,
+    $testRebindResult,
+    $activeEvents[-1],
+    $experimentNotRestarted
+)
+$deathAtNs = Get-EventAtNsCheck `
+    -Events $deathTimelineEvents `
+    -Required $requireExtendedAtNs
 $death = [ordered]@{
     connectionEpoch = $invalidConnectionEpoch
     invalidGenerationId = $invalidGenerationId
@@ -943,6 +1061,11 @@ $death = [ordered]@{
             (Get-Field -Event $_ -Name "reason") -ne "published to readers"
         }).Count -eq 0
     lifecycleOrder = $deathLifecycleOrder
+    atNsAvailable = $deathAtNs.available
+    atNsCoverage = $deathAtNs.coverage
+    atNsExpected = $deathAtNs.expected
+    strictlyIncreasingAtNs = $deathAtNs.strictlyIncreasing
+    atNs = $deathAtNs.values
     observedFailureOrder = "binderDied-before-controlled-dead-object-probe"
     reboundGenerationDidNotRestartExperiment = (Get-Field `
         -Event $experimentNotRestarted `
@@ -1001,10 +1124,12 @@ $allRequiredChecksPassed = `
     -and $crossNode.meaningfulCrossNodeOverlap `
     -and $crossNode.overlappingBinderThreadsDiffer `
     -and $async.sameRequestId `
+    -and $async.fullMarkerOrder `
     -and $async.serverToCallbackOrder `
     -and $async.requestIdsMatchIndependently `
     -and $async.proxyClassesObserved `
     -and $async.topologyPassed `
+    -and (-not $requireExtendedAtNs -or $async.strictlyIncreasingAtNs) `
     -and $death.invalidatedFromActive `
     -and $death.t1LastSuccessObserved `
     -and $death.invalidatedCurrentGeneration `
@@ -1015,30 +1140,44 @@ $allRequiredChecksPassed = `
     -and $death.explicitTestRebindReachedNewGeneration `
     -and $death.spaceContainingValuesParsed `
     -and $death.lifecycleOrder `
+    -and (-not $requireExtendedAtNs -or $death.strictlyIncreasingAtNs) `
     -and $death.reboundGenerationDidNotRestartExperiment `
     -and $death.rebindReportedBound `
     -and $death.forbiddenMarkersAbsent
 
-$analysisGeneratedAt = [DateTimeOffset]::Now
-if ($analysisGeneratedAt -le $captureStartedAtValue) {
-    throw "analysis.generatedAt must be later than captureStartedAt"
+$reportGeneratedAt = [DateTimeOffset]::Now
+if ($reportGeneratedAt -le $captureStartedAtValue) {
+    throw "Analysis report time must be later than captureStartedAt"
 }
 $analysis = [ordered]@{
-    schemaVersion = 6
+    schemaVersion = 7
+    analysisMode = $AnalysisMode.ToLowerInvariant()
     captureId = $CaptureId
     captureStartedAt = $CaptureStartedAt
-    generatedAt = $analysisGeneratedAt.ToString("o")
-    evidenceDirectory = "evidence"
-    handlerLatencyBaseline = $handlerBaseline
-    handlerLatencyBlocked = $handlerBlocked
-    handlerLatencyComparison = $handlerComparison
-    syncReentry = $sync
-    onewaySameNode = $sameNode
-    onewayCrossNode = $crossNode
-    asyncCallback = $async
-    binderDeath = $death
-    allRequiredChecksPassed = $allRequiredChecksPassed
 }
+if ($AnalysisMode -eq "Capture") {
+    $analysis.generatedAt = $reportGeneratedAt.ToString("o")
+} else {
+    $analysis.originalAnalysisSha256 = $originalAnalysisSha256
+    $analysis.replayedAt = $reportGeneratedAt.ToString("o")
+    $analysis.sourceAnalysisGeneratedAt = $sourceAnalysisGeneratedAt
+    $analysis.sourceAnalysisSchemaVersion = [int]$sourceAnalysis.schemaVersion
+    $analysis.sourceAnalysisMode = if ($legacyCaptureReplay) {
+        "legacy-capture"
+    } else {
+        "capture"
+    }
+}
+$analysis.evidenceDirectory = "evidence"
+$analysis.handlerLatencyBaseline = $handlerBaseline
+$analysis.handlerLatencyBlocked = $handlerBlocked
+$analysis.handlerLatencyComparison = $handlerComparison
+$analysis.syncReentry = $sync
+$analysis.onewaySameNode = $sameNode
+$analysis.onewayCrossNode = $crossNode
+$analysis.asyncCallback = $async
+$analysis.binderDeath = $death
+$analysis.allRequiredChecksPassed = $allRequiredChecksPassed
 
 $json = ($analysis | ConvertTo-Json -Depth 12) -replace "`r`n?", "`n"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -1157,7 +1296,9 @@ $keyEvidenceReplacements = [ordered]@{
     "{{INVALID_OLD_STATE}}" = Get-Field -Event $invalidEvent -Name "oldState"
     "{{INVALID_WAS_CURRENT}}" = Get-Field -Event $invalidEvent -Name "wasCurrent"
     "{{INVALID_REASON}}" = Get-Field -Event $invalidEvent -Name "reason"
+    "{{DEAD_OBJECT_CONNECTION_EPOCH}}" = Get-Field -Event $deadObjectEvent -Name "connectionEpoch"
     "{{DEAD_OBJECT_GENERATION_ID}}" = Get-Field -Event $deadObjectEvent -Name "generationId"
+    "{{DEAD_OBJECT_REQUEST_ID}}" = Get-Field -Event $deadObjectEvent -Name "requestId"
     "{{DEAD_OBJECT_EXCEPTION}}" = Get-Field -Event $deadObjectEvent -Name "exception"
     "{{SECOND_CONNECTION_EPOCH}}" = Get-Field -Event $secondActive -Name "connectionEpoch"
     "{{SECOND_GENERATION_ID}}" = Get-Field -Event $secondActive -Name "generationId"

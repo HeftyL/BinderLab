@@ -747,11 +747,14 @@ public final class MainActivity extends Activity {
     }
 
     private static String point(String marker, String detail) {
+        String timedDetail = detail.startsWith("atNs=") || detail.contains(" atNs=")
+                ? detail
+                : detail + " atNs=" + SystemClock.elapsedRealtimeNanos();
         return marker
                 + " pid=" + Process.myPid()
                 + " tid=" + Process.myTid()
                 + " thread=" + Thread.currentThread().getName()
-                + " " + detail;
+                + " " + timedDetail;
     }
 
     private enum GenerationState {
