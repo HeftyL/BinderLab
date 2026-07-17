@@ -253,6 +253,34 @@ function Get-EventAtNsCheck {
     }
 }
 
+function Test-EventLogOrder {
+    param(
+        [object]$Before,
+        [object]$After
+    )
+
+    return $Before.Index -lt $After.Index
+}
+
+function Test-EventAtNsOrder {
+    param(
+        [object]$Before,
+        [object]$After,
+        [bool]$Required
+    )
+
+    foreach ($event in @($Before, $After)) {
+        if (-not $event.Fields.Contains("atNs")) {
+            if ($Required) {
+                throw "Event $($event.Marker) has no atNs field: $($event.Raw)"
+            }
+            return $null
+        }
+    }
+    return [long](Get-Field -Event $Before -Name "atNs") `
+        -lt [long](Get-Field -Event $After -Name "atNs")
+}
+
 function Get-Intervals {
     param(
         [object[]]$Events,
@@ -888,10 +916,77 @@ $asyncTimelineEvents = @(
 $asyncAtNs = Get-EventAtNsCheck `
     -Events $asyncTimelineEvents `
     -Required $requireExtendedAtNs
+$asyncClientCallOrderPassed = Test-EventLogOrder `
+    -Before $asyncBegin `
+    -After $asyncReturn
+$asyncServerHandlerOrderPassed = (Test-EventLogOrder `
+        -Before $asyncBegin `
+        -After $asyncServerPost) `
+    -and (Test-EventLogOrder `
+        -Before $asyncServerPost `
+        -After $asyncServerRun)
+$asyncCallbackOrderPassed = (Test-EventLogOrder `
+        -Before $asyncServerRun `
+        -After $asyncCallback) `
+    -and (Test-EventLogOrder `
+        -Before $asyncCallback `
+        -After $asyncObserved)
+$asyncClientEventuallyObservedCallback = Test-EventLogOrder `
+    -Before $asyncReturn `
+    -After $asyncObserved
+$asyncPartialOrderPassed = $asyncClientCallOrderPassed `
+    -and $asyncServerHandlerOrderPassed `
+    -and $asyncCallbackOrderPassed `
+    -and $asyncClientEventuallyObservedCallback
+
+$asyncClientCallAtNsOrderPassed = Test-EventAtNsOrder `
+    -Before $asyncBegin `
+    -After $asyncReturn `
+    -Required $requireExtendedAtNs
+$asyncServerHandlerAtNsOrderPassed = (Test-EventAtNsOrder `
+        -Before $asyncBegin `
+        -After $asyncServerPost `
+        -Required $requireExtendedAtNs) `
+    -and (Test-EventAtNsOrder `
+        -Before $asyncServerPost `
+        -After $asyncServerRun `
+        -Required $requireExtendedAtNs)
+$asyncCallbackAtNsOrderPassed = (Test-EventAtNsOrder `
+        -Before $asyncServerRun `
+        -After $asyncCallback `
+        -Required $requireExtendedAtNs) `
+    -and (Test-EventAtNsOrder `
+        -Before $asyncCallback `
+        -After $asyncObserved `
+        -Required $requireExtendedAtNs)
+$asyncClientEventuallyObservedCallbackAtNs = Test-EventAtNsOrder `
+    -Before $asyncReturn `
+    -After $asyncObserved `
+    -Required $requireExtendedAtNs
+$asyncPartialOrderAtNsPassed = if ($asyncAtNs.available) {
+    $asyncClientCallAtNsOrderPassed `
+        -and $asyncServerHandlerAtNsOrderPassed `
+        -and $asyncCallbackAtNsOrderPassed `
+        -and $asyncClientEventuallyObservedCallbackAtNs
+} else {
+    $null
+}
+$asyncAtNsByMarker = [ordered]@{}
+if ($asyncAtNs.available) {
+    foreach ($event in $asyncTimelineEvents) {
+        $asyncAtNsByMarker[$event.Marker] = [long](Get-Field `
+            -Event $event `
+            -Name "atNs")
+    }
+}
 $async = [ordered]@{
     requestId = [int]$asyncRequestIds[0]
     sameRequestId = $asyncRequestIds.Count -eq 1
-    fullMarkerOrder = Test-MarkerOrder -Events $asyncEvents -Markers $asyncMarkers
+    clientCallOrderPassed = $asyncClientCallOrderPassed
+    serverHandlerOrderPassed = $asyncServerHandlerOrderPassed
+    callbackOrderPassed = $asyncCallbackOrderPassed
+    clientEventuallyObservedCallback = $asyncClientEventuallyObservedCallback
+    partialOrderPassed = $asyncPartialOrderPassed
     serverToCallbackOrder = Test-MarkerOrder -Events $asyncEvents -Markers $asyncServerChain
     requestIdsMatchIndependently = $asyncRequestIds.Count -eq 1
     selfReportedRequestMatches = (Get-Field `
@@ -930,8 +1025,13 @@ $async = [ordered]@{
     atNsAvailable = $asyncAtNs.available
     atNsCoverage = $asyncAtNs.coverage
     atNsExpected = $asyncAtNs.expected
-    strictlyIncreasingAtNs = $asyncAtNs.strictlyIncreasing
-    atNs = $asyncAtNs.values
+    clientCallAtNsOrderPassed = $asyncClientCallAtNsOrderPassed
+    serverHandlerAtNsOrderPassed = $asyncServerHandlerAtNsOrderPassed
+    callbackAtNsOrderPassed = $asyncCallbackAtNsOrderPassed
+    clientEventuallyObservedCallbackAtNs = `
+        $asyncClientEventuallyObservedCallbackAtNs
+    partialOrderAtNsPassed = $asyncPartialOrderAtNsPassed
+    atNs = $asyncAtNsByMarker
     calculatorClass = Get-Field -Event $connectedActive -Name "calculatorClass"
     calculatorBinderClass = Get-Field `
         -Event $connectedActive `
@@ -1133,12 +1233,11 @@ $allRequiredChecksPassed = `
     -and $crossNode.meaningfulCrossNodeOverlap `
     -and $crossNode.overlappingBinderThreadsDiffer `
     -and $async.sameRequestId `
-    -and $async.fullMarkerOrder `
-    -and $async.serverToCallbackOrder `
+    -and $async.partialOrderPassed `
     -and $async.requestIdsMatchIndependently `
     -and $async.proxyClassesObserved `
     -and $async.topologyPassed `
-    -and (-not $requireExtendedAtNs -or $async.strictlyIncreasingAtNs) `
+    -and (-not $requireExtendedAtNs -or $async.partialOrderAtNsPassed) `
     -and $death.invalidatedFromActive `
     -and $death.t1LastSuccessObserved `
     -and $death.invalidatedCurrentGeneration `

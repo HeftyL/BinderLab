@@ -13,6 +13,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$EvidenceSourceCommit,
     [Parameter(Mandatory = $true)]
+    [string]$CaptureId,
+    [Parameter(Mandatory = $true)]
+    [string]$EvidenceApkSha256,
+    [Parameter(Mandatory = $true)]
     [string]$WorkflowRunId,
     [Parameter(Mandatory = $true)]
     [string]$WorkflowRunAttempt,
@@ -38,6 +42,12 @@ if ($ParentCommit -ne "none" -and $ParentCommit -notmatch '^[0-9a-f]{40}$') {
 }
 if ($BinderLabTag -notmatch '^(?:unreleased|android16-qpr2-evidence-v[0-9]+(?:\.[0-9]+)*)$') {
     throw "Unexpected BinderLab tag value: $BinderLabTag"
+}
+if ($CaptureId -notmatch '^[A-Za-z0-9][A-Za-z0-9-]+$') {
+    throw "Unexpected capture id: $CaptureId"
+}
+if ($EvidenceApkSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw "Expected evidenceApkSha256 to be a lowercase SHA-256 value"
 }
 
 $generatedRelativePaths = @(
@@ -91,14 +101,20 @@ if ($replayReport.analysisMode -cne "replay" -or
         $replayReport.originalAnalysisSha256 -notmatch '^[0-9a-f]{64}$') {
     throw "evidence-replay-report.json is not a successful provenance-bound replay"
 }
+if ($replayReport.captureId -cne $CaptureId) {
+    throw "Evidence replay captureId does not match the artifact input"
+}
 
 $javacOutput = (& javac -version 2>&1 | ForEach-Object { $_.ToString() }) -join " "
 if ($LASTEXITCODE -ne 0 -or $javacOutput -notmatch '^javac\s+21(?:\.|$)') {
     throw "Expected javac 21.x, got: $javacOutput"
 }
 $provenancePath = Join-Path $buildPath "verification-provenance.txt"
+$verificationApkSha256 = (Get-FileHash `
+    -LiteralPath (Join-Path $buildPath "BinderLab-debug.apk") `
+    -Algorithm SHA256).Hash.ToLowerInvariant()
 $provenanceLines = @(
-    "artifactSchemaVersion=1",
+    "artifactSchemaVersion=2",
     "producerRepository=$ProducerRepository",
     "producerCommit=$ProducerCommit",
     "parentRepository=$ParentRepository",
@@ -107,6 +123,9 @@ $provenanceLines = @(
     "binderLabTag=$BinderLabTag",
     "binderLabCommit=$BinderLabCommit",
     "evidenceSourceCommit=$EvidenceSourceCommit",
+    "captureId=$CaptureId",
+    "evidenceApkSha256=$EvidenceApkSha256",
+    "verificationApkSha256=$verificationApkSha256",
     "workflowRunId=$WorkflowRunId",
     "workflowRunAttempt=$WorkflowRunAttempt",
     "sdkPlatform=$SdkPlatform",

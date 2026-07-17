@@ -9,12 +9,12 @@ git clone https://github.com/HeftyL/BinderLab.git
 cd .\BinderLab
 ```
 
-本轮已审核证据的修订发布版固定在 tag `android16-qpr2-evidence-v1.1`。该 tag 保留 v1 的原始真机日志和实验结论，只修订公共克隆/checkout 说明、CI/replay provenance、关键摘要字段和后续采集的单调时钟埋点；旧 `android16-qpr2-evidence-v1` 仍保留在原 commit，不会重指向。`main` 是最新开发线，不能替代发布 tag：
+本轮已审核证据的发布版固定在 tag `android16-qpr2-evidence-v1.2`。该 tag 不改写 v1.1 的原始真机日志和实验结论，只修正异步 callback 的稳定偏序门禁，增加合成调度回归、采集 APK/CI 重建 APK 的独立 provenance，并把普通验证与手工发布权限拆开；旧 `android16-qpr2-evidence-v1`、`android16-qpr2-evidence-v1.1` 都保留在原 commit，不会重指向。`main` 是最新开发线，不能替代发布 tag：
 
 ```powershell
-git checkout --detach android16-qpr2-evidence-v1.1
-git cat-file -t refs/tags/android16-qpr2-evidence-v1.1  # 应输出 tag，而不是 commit
-git rev-list -n 1 refs/tags/android16-qpr2-evidence-v1.1
+git checkout --detach android16-qpr2-evidence-v1.2
+git cat-file -t refs/tags/android16-qpr2-evidence-v1.2  # 应输出 tag，而不是 commit
+git rev-list -n 1 refs/tags/android16-qpr2-evidence-v1.2
 ```
 
 这里的“固定发布 tag”表示发布策略要求不得移动；annotated tag 仍是 Git ref。若仓库规则尚未禁止更新/删除匹配 tag，文档和脚本只能证明当前解析结果一致，不能承诺未来权限持有者绝对无法移动它。
@@ -207,15 +207,15 @@ N1 与 N2 至少一组区间重叠，且服务端 TID 不同
 
 ### 4. Handler 与异步 callback
 
-服务端链内必须满足：
+分析器只把下列稳定偏序作为通过门禁：
 
 ```text
-S_HANDLER_POST
-S_HANDLER_RUN
-C_CALLBACK
+C_ASYNC_CALL_BEGIN < C_ASYNC_CALL_RETURN
+C_ASYNC_CALL_BEGIN < S_HANDLER_POST < S_HANDLER_RUN < C_CALLBACK < C_ASYNC_CALLBACK_OBSERVED
+C_ASYNC_CALL_RETURN < C_ASYNC_CALLBACK_OBSERVED
 ```
 
-`C_ASYNC_CALL_RETURN` 只表示调用方没有等待服务端业务完成。它与 `S_HANDLER_POST` 的跨进程日志先后受并发调度影响，不是平台保证；本轮实际观察到客户端先返回，随后才出现 post、run 和 callback。无论日志怎样交错，这都不是同步嵌套，也不能证明等待线程复用。
+`C_ASYNC_CALL_RETURN` 只表示调用方没有等待服务端业务完成。它与 `S_HANDLER_POST`、`S_HANDLER_RUN`、`C_CALLBACK` 的跨进程先后受并发调度影响，不是平台保证；因此观测到的六个 marker 总顺序只作为描述字段，不参与通过判定。合成回归会接受 post 或 callback 早于 return 的合法交错，并分别拒绝破坏上述每条稳定边的调度。本轮实际观察到客户端先返回，随后才出现 post、run 和 callback；无论日志怎样交错，这都不是同步嵌套，也不能证明等待线程复用。
 
 ## 六、2026-07-15 主机侧封存的 API 36 实机观测
 
@@ -278,6 +278,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\verify.ps1
 ```
 
-校验器会以 SDK Platform 36.1、Build Tools / AIDL 36.0.0 重新构建，并检查四个 AIDL 接口、oneway flags、callback / 返回 Binder 引用、生成物 SHA-256、APK SDK 元数据和签名、证据日志重算、关键证据页、clean commit 绑定、公开设备信息去标识、仓库根 workflow、Markdown 链接/围栏、公开链接边界、旧版本残留和 Git whitespace。仓库根 `.gitattributes` 把文本固定为 LF；源码清单把它和全部构建、采集、分析输入写成仓库相对路径。CI 在每次 push 开始先把 `binderlab/standalone-verification` 写成 pending，结束时无论成功、失败还是取消都覆盖最终状态；artifact 缺少任一 APK、metadata、replay report 或四个 AIDL Java 文件都会失败。ZIP 内的 `verification-provenance.txt` 和 `artifact-manifest.sha256` 让文件离开 Actions 页面后仍能核对 commit、run、SDK、Java 与逐文件 SHA-256。
+校验器会以 SDK Platform 36.1、Build Tools / AIDL 36.0.0 重新构建，并检查四个 AIDL 接口、oneway flags、callback / 返回 Binder 引用、生成物 SHA-256、APK SDK 元数据和签名、证据日志重算、异步偏序回归、关键证据页、clean commit 绑定、公开设备信息去标识、仓库根 workflow、Markdown 链接/围栏、公开链接边界、旧版本残留和 Git whitespace。仓库根 `.gitattributes` 把文本固定为 LF；源码清单把它和全部构建、采集、分析输入写成仓库相对路径。
+
+普通 `binderlab-verify.yml` 只有 `contents: read` 和状态写权限，push 开始时把 `binderlab/standalone-verification` 写成 pending；末尾 `always()` 步骤实际执行时才覆盖为 success、failure 或 error。若 runner 或平台在该步骤前被硬终止，pending 可能保留，它安全地表示“尚未完成”，不能当作通过。`binderlab-release.yml` 只能手工触发：调用者必须给出完整 commit 和新 tag；工作流先要求目标 commit 已有独立验证 success，再创建或核对不可移动策略下的 annotated tag，从该 tag 重建并写入 `binderlab/release-verification`。
+
+commit-bound 与 tag-bound artifact 缺少任一 APK、metadata、replay report 或四个 AIDL Java 文件都会失败。ZIP 内的 `verification-provenance.txt` 分开记录 `captureId`、真机实际运行的 `evidenceApkSha256` 和本次 CI 重建的 `verificationApkSha256`；`artifact-manifest.sha256` 再绑定逐文件 SHA-256，让文件离开 Actions 页面后仍能核对 commit、tag、run、SDK 与 Java。
 
 BinderLab 不依赖任何外部文章仓库或私有文档路径；需要引用这些实验的文章应单向链接本公共仓库。真机采集仍只在有设备的环境执行。网络内容与证据语义仍需人工复核，脚本通过不等于技术结论自动正确。

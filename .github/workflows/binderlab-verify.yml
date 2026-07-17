@@ -3,9 +3,11 @@ name: BinderLab verify
 on:
   pull_request:
   push:
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
@@ -96,32 +98,35 @@ jobs:
           }
           .\verify.ps1 @verifyArgs
 
-      - name: Validate and describe artifact contents
+      - name: Validate and describe commit-bound artifacts
         shell: pwsh
         run: |
-          $tag = (& git describe --tags --exact-match HEAD 2>$null | Select-Object -First 1)
-          if ([string]::IsNullOrWhiteSpace($tag)) {
-            $tag = "unreleased"
+          $source = @{}
+          foreach ($line in Get-Content -LiteralPath .\evidence\source.txt -Encoding UTF8) {
+            if ($line -match '^(?<key>[A-Za-z][A-Za-z0-9]*)=(?<value>.*)$') {
+              $source[$Matches.key] = $Matches.value
+            }
           }
-          $sourceCommitLines = @(Get-Content .\evidence\source.txt |
-            Where-Object { $_ -match '^gitCommit=[0-9a-f]{40}$' })
-          if ($sourceCommitLines.Count -ne 1) {
-            throw "evidence/source.txt must contain exactly one gitCommit"
+          foreach ($requiredKey in @('gitCommit', 'captureId', 'apkSha256')) {
+            if (-not $source.ContainsKey($requiredKey)) {
+              throw "evidence/source.txt is missing $requiredKey"
+            }
           }
-          $sourceCommit = $sourceCommitLines[0].Substring('gitCommit='.Length)
           .\write-verification-artifacts.ps1 `
             -ProducerRepository "${{ github.repository }}" `
             -ProducerCommit "${{ github.sha }}" `
-            -BinderLabTag $tag `
+            -BinderLabTag "unreleased" `
             -BinderLabCommit "${{ github.sha }}" `
-            -EvidenceSourceCommit $sourceCommit `
+            -EvidenceSourceCommit $source.gitCommit `
+            -CaptureId $source.captureId `
+            -EvidenceApkSha256 $source.apkSha256 `
             -WorkflowRunId "${{ github.run_id }}" `
             -WorkflowRunAttempt "${{ github.run_attempt }}"
 
-      - name: Upload reproducibility artifacts
+      - name: Upload commit-bound reproducibility artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BinderLab-api36.1-verification
+          name: BinderLab-api36.1-${{ github.sha }}-verification
           if-no-files-found: error
           path: |
             build/BinderLab-debug.apk
@@ -134,32 +139,6 @@ jobs:
             build/generated/com/example/binderdemo/ISyncResultCallback.java
             build/verification-provenance.txt
             build/artifact-manifest.sha256
-
-      - name: Publish annotated v1.1 release tag once
-        if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'publish BinderLab evidence v1.1' }}
-        shell: pwsh
-        env:
-          RELEASE_TAG: android16-qpr2-evidence-v1.1
-        run: |
-          & git fetch origin "refs/tags/${env:RELEASE_TAG}:refs/tags/${env:RELEASE_TAG}" 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            $existing = (& git rev-list -n 1 "refs/tags/$env:RELEASE_TAG").Trim()
-            if ($existing -ne $env:GITHUB_SHA) {
-              throw "$env:RELEASE_TAG already exists at $existing; published tags must not move"
-            }
-            if ((& git cat-file -t "refs/tags/$env:RELEASE_TAG").Trim() -ne "tag") {
-              throw "$env:RELEASE_TAG exists but is not an annotated tag"
-            }
-            Write-Host "$env:RELEASE_TAG already points to this release commit"
-            exit 0
-          }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a $env:RELEASE_TAG -m "Android 16 QPR2 BinderLab evidence v1.1" $env:GITHUB_SHA
-          git push origin "refs/tags/$env:RELEASE_TAG"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Could not publish annotated tag $env:RELEASE_TAG"
-          }
 
       - name: Publish final standalone status
         if: ${{ always() && github.event_name == 'push' }}

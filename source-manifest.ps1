@@ -22,6 +22,8 @@ $paths = New-Object System.Collections.Generic.List[string]
 $paths.Add((Join-Path $gitRoot ".gitattributes"))
 
 foreach ($relativePath in @(
+    ".github/workflows/binderlab-release.yml",
+    ".github/workflows/binderlab-verify.yml",
     "AndroidManifest.xml",
     "build.ps1",
     "run-experiment.ps1",
@@ -29,6 +31,7 @@ foreach ($relativePath in @(
     "analyze-evidence.ps1",
     "key-evidence.template",
     "source-manifest.ps1",
+    "tests/analyzer-async-partial-order.ps1",
     "verify.ps1",
     "write-verification-artifacts.ps1"
 )) {

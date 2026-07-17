@@ -1,0 +1,260 @@
+name: BinderLab release
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: Immutable annotated tag to create or verify
+        required: true
+        type: string
+      releaseCommit:
+        description: Full BinderLab commit already verified on main
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate immutable release inputs
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.releaseTag }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^android16-qpr2-evidence-v[0-9]+(?:\.[0-9]+)*$') {
+            throw "Release tag has an invalid format: $env:RELEASE_TAG"
+          }
+          if ($env:RELEASE_COMMIT -notmatch '^[0-9a-f]{40}$') {
+            throw "Release commit must be a full lowercase commit id"
+          }
+          & git cat-file -e "$env:RELEASE_COMMIT^{commit}"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release commit is unavailable: $env:RELEASE_COMMIT"
+          }
+          & git merge-base --is-ancestor $env:RELEASE_COMMIT origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release commit must already be reachable from origin/main"
+          }
+
+      - name: Publish pending release status
+        id: pending
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $body = @{
+            state = "pending"
+            target_url = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            description = "BinderLab tag-bound release verification is running"
+            context = "binderlab/release-verification"
+          } | ConvertTo-Json
+          Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/statuses/$env:RELEASE_COMMIT" `
+            -Headers $headers `
+            -Body $body `
+            -ContentType "application/json" | Out-Null
+
+      - name: Require successful standalone verification
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $statuses = Invoke-RestMethod `
+            -Method Get `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/commits/$env:RELEASE_COMMIT/status" `
+            -Headers $headers
+          $standalone = @($statuses.statuses | Where-Object {
+              $_.context -eq "binderlab/standalone-verification"
+            } | Select-Object -First 1)
+          if ($standalone.Count -ne 1 -or $standalone[0].state -ne "success") {
+            throw "Release commit has no successful binderlab/standalone-verification status"
+          }
+
+      - name: Create or verify immutable annotated tag
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.releaseTag }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          & git fetch origin "+refs/tags/${env:RELEASE_TAG}:refs/tags/${env:RELEASE_TAG}" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $type = (& git cat-file -t "refs/tags/$env:RELEASE_TAG").Trim()
+            $target = (& git rev-list -n 1 "refs/tags/$env:RELEASE_TAG").Trim()
+            if ($type -ne "tag") {
+              throw "$env:RELEASE_TAG exists but is not an annotated tag"
+            }
+            if ($target -ne $env:RELEASE_COMMIT) {
+              throw "$env:RELEASE_TAG already exists at $target; published tags must not move"
+            }
+            Write-Host "$env:RELEASE_TAG already points to the requested commit"
+            exit 0
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a $env:RELEASE_TAG -m "Android 16 QPR2 BinderLab evidence $env:RELEASE_TAG" $env:RELEASE_COMMIT
+          git push origin "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not publish annotated tag $env:RELEASE_TAG"
+          }
+
+      - name: Checkout immutable release tag
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.releaseTag }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          & git checkout --detach "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0 -or (& git rev-parse HEAD).Trim() -ne $env:RELEASE_COMMIT) {
+            throw "Could not check out the requested release tag and commit"
+          }
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Android 16 QPR2 toolchain
+        shell: pwsh
+        run: |
+          $sdkRoot = if ($env:ANDROID_SDK_ROOT) {
+            $env:ANDROID_SDK_ROOT
+          } else {
+            $env:ANDROID_HOME
+          }
+          if (-not $sdkRoot) {
+            throw "ANDROID_SDK_ROOT and ANDROID_HOME are both empty"
+          }
+          $sdkManager = Get-ChildItem `
+            -LiteralPath (Join-Path $sdkRoot "cmdline-tools") `
+            -Recurse `
+            -Filter sdkmanager.bat | Select-Object -First 1
+          if (-not $sdkManager) {
+            throw "sdkmanager.bat was not found under $sdkRoot"
+          }
+          $answers = 1..20 | ForEach-Object { "y" }
+          $answers | & $sdkManager.FullName `
+            --sdk_root=$sdkRoot `
+            "platforms;android-36.1" `
+            "build-tools;36.0.0"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Android SDK package installation failed"
+          }
+          "ANDROID_SDK_ROOT=$sdkRoot" >> $env:GITHUB_ENV
+
+      - name: Rebuild and verify the tag
+        shell: pwsh
+        run: |
+          .\verify.ps1 `
+            -SdkRoot $env:ANDROID_SDK_ROOT `
+            -CompileSdkPlatform "36.1" `
+            -BuildToolsVersion "36.0.0"
+
+      - name: Generate tag-bound artifacts
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.releaseTag }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          $source = @{}
+          foreach ($line in Get-Content -LiteralPath .\evidence\source.txt -Encoding UTF8) {
+            if ($line -match '^(?<key>[A-Za-z][A-Za-z0-9]*)=(?<value>.*)$') {
+              $source[$Matches.key] = $Matches.value
+            }
+          }
+          foreach ($requiredKey in @('gitCommit', 'captureId', 'apkSha256')) {
+            if (-not $source.ContainsKey($requiredKey)) {
+              throw "evidence/source.txt is missing $requiredKey"
+            }
+          }
+          .\write-verification-artifacts.ps1 `
+            -ProducerRepository "${{ github.repository }}" `
+            -ProducerCommit $env:RELEASE_COMMIT `
+            -BinderLabTag $env:RELEASE_TAG `
+            -BinderLabCommit $env:RELEASE_COMMIT `
+            -EvidenceSourceCommit $source.gitCommit `
+            -CaptureId $source.captureId `
+            -EvidenceApkSha256 $source.apkSha256 `
+            -WorkflowRunId "${{ github.run_id }}" `
+            -WorkflowRunAttempt "${{ github.run_attempt }}"
+
+      - name: Upload tag-bound reproducibility artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BinderLab-api36.1-${{ inputs.releaseTag }}-verification
+          if-no-files-found: error
+          path: |
+            build/BinderLab-debug.apk
+            build/apk-badging.txt
+            build/toolchain.txt
+            build/evidence-replay-report.json
+            build/generated/com/example/binderdemo/IAsyncWorker.java
+            build/generated/com/example/binderdemo/ICalculator.java
+            build/generated/com/example/binderdemo/IResultCallback.java
+            build/generated/com/example/binderdemo/ISyncResultCallback.java
+            build/verification-provenance.txt
+            build/artifact-manifest.sha256
+
+      - name: Publish final release status
+        if: ${{ always() && steps.pending.outcome == 'success' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          RELEASE_COMMIT: ${{ inputs.releaseCommit }}
+        run: |
+          $state = switch ($env:JOB_STATUS) {
+            "success" { "success" }
+            "cancelled" { "error" }
+            default { "failure" }
+          }
+          $description = switch ($state) {
+            "success" { "Annotated tag, rebuild, replay, and artifacts passed" }
+            "error" { "BinderLab release verification was cancelled" }
+            default { "BinderLab release verification failed"
+            }
+          }
+          $headers = @{
+            Accept = "application/vnd.github+json"
+            Authorization = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $body = @{
+            state = $state
+            target_url = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            description = $description
+            context = "binderlab/release-verification"
+          } | ConvertTo-Json
+          $status = Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/statuses/$env:RELEASE_COMMIT" `
+            -Headers $headers `
+            -Body $body `
+            -ContentType "application/json"
+          if ($status.state -ne $state -or
+              $status.context -ne "binderlab/release-verification") {
+            throw "GitHub did not persist the expected release status"
+          }

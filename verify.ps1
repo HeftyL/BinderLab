@@ -374,10 +374,20 @@ if ($freshAnalysis.analysisMode -cne "replay" -or
 if ($committedLegacyCapture) {
     foreach ($propertyName in @(
             "fullMarkerOrder",
+            "clientCallOrderPassed",
+            "serverHandlerOrderPassed",
+            "callbackOrderPassed",
+            "clientEventuallyObservedCallback",
+            "partialOrderPassed",
             "atNsAvailable",
             "atNsCoverage",
             "atNsExpected",
             "strictlyIncreasingAtNs",
+            "clientCallAtNsOrderPassed",
+            "serverHandlerAtNsOrderPassed",
+            "callbackAtNsOrderPassed",
+            "clientEventuallyObservedCallbackAtNs",
+            "partialOrderAtNsPassed",
             "atNs"
         )) {
         [void]$freshAnalysis.asyncCallback.PSObject.Properties.Remove($propertyName)
@@ -424,6 +434,10 @@ if ($committedKeyEvidence -cne $freshKeyEvidence) {
 if (-not $committedAnalysis.allRequiredChecksPassed) {
     throw "Evidence analysis reports a failed required check"
 }
+
+& (Join-Path $projectRoot "tests\analyzer-async-partial-order.ps1") `
+    -ProjectRoot $projectRoot | Out-Null
+
 if ($committedAnalysis.handlerLatencyBaseline.runCount -ne 5 -or
         $committedAnalysis.handlerLatencyBlocked.runCount -ne 5) {
     throw "Expected exactly five baseline and five blocked Handler evidence runs"
@@ -700,11 +714,42 @@ foreach ($pattern in $sensitivePatterns) {
     }
 }
 
-$workflowPath = Join-Path $gitRoot ".github\workflows\binderlab-verify.yml"
-if (-not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) {
-    throw "Standalone BinderLab workflow is not located at the repository root"
+$trackedPublicTextPaths = @(& git -C $gitRoot ls-files -- `
+        "*.md" `
+        "*.txt" `
+        "*.log" `
+        "*.json" |
+    ForEach-Object { Join-Path $gitRoot $_ })
+$repositoryPrivacyPatterns = @(
+    '(?<![A-Za-z0-9])(?-i:[A-Z]\d{3,}[A-Z]{2})(?![A-Za-z0-9])',
+    '(?im)\badb(?:\.exe)?\s+-s\s+(?!<|\$|%)[A-Za-z0-9._:-]{6,}',
+    '(?im)^\s*(?:deviceSerial|serial(?:no|number)?)\s*[=:]\s*(?!not-recorded\b)[A-Za-z0-9._:-]{6,}'
+)
+foreach ($pattern in $repositoryPrivacyPatterns) {
+    $hits = Select-String `
+        -LiteralPath $trackedPublicTextPaths `
+        -Pattern $pattern `
+        -Encoding UTF8
+    if ($hits) {
+        throw "Tracked public text contains device-identifying data matching '$pattern':`n$($hits -join "`n")"
+    }
 }
-$workflowContent = Get-Content -LiteralPath $workflowPath -Raw -Encoding UTF8
+
+$verifyWorkflowPath = Join-Path $gitRoot ".github\workflows\binderlab-verify.yml"
+$releaseWorkflowPath = Join-Path $gitRoot ".github\workflows\binderlab-release.yml"
+foreach ($workflowPath in @($verifyWorkflowPath, $releaseWorkflowPath)) {
+    if (-not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) {
+        throw "Required BinderLab workflow is not located at the repository root: $workflowPath"
+    }
+}
+$verifyWorkflowContent = Get-Content `
+    -LiteralPath $verifyWorkflowPath `
+    -Raw `
+    -Encoding UTF8
+$releaseWorkflowContent = Get-Content `
+    -LiteralPath $releaseWorkflowPath `
+    -Raw `
+    -Encoding UTF8
 foreach ($requiredWorkflowText in @(
     'build/BinderLab-debug.apk',
     'build/evidence-replay-report.json',
@@ -715,25 +760,62 @@ foreach ($requiredWorkflowText in @(
     'github.event.before',
     '$verifyArgs.DiffBase = "${{ github.event.before }}"',
     'statuses: write',
-    'contents: write',
+    'contents: read',
     'state = "pending"',
     'always() && github.event_name == ''push''',
     'binderlab/standalone-verification',
     'if-no-files-found: error',
     '.\write-verification-artifacts.ps1',
-    'Publish annotated v1.1 release tag once',
-    'published tags must not move'
+    '-BinderLabTag "unreleased"',
+    '-CaptureId $source.captureId',
+    '-EvidenceApkSha256 $source.apkSha256',
+    'BinderLab-api36.1-${{ github.sha }}-verification'
 )) {
-    if ($workflowContent -notmatch [regex]::Escape($requiredWorkflowText)) {
-        throw "Repository-root workflow is missing: $requiredWorkflowText"
+    if ($verifyWorkflowContent -notmatch [regex]::Escape($requiredWorkflowText)) {
+        throw "Standalone verify workflow is missing: $requiredWorkflowText"
     }
 }
-foreach ($forbiddenWorkflowText in @(
+foreach ($forbiddenVerifyWorkflowText in @(
         'if-no-files-found: warn',
-        'build/analysis.verify.json'
+        'build/analysis.verify.json',
+        'contents: write',
+        'git tag -a',
+        'git push origin "refs/tags/',
+        'github.event.head_commit.message'
     )) {
-    if ($workflowContent.Contains($forbiddenWorkflowText)) {
-        throw "Repository-root workflow still contains: $forbiddenWorkflowText"
+    if ($verifyWorkflowContent.Contains($forbiddenVerifyWorkflowText)) {
+        throw "Standalone verify workflow still contains: $forbiddenVerifyWorkflowText"
+    }
+}
+foreach ($requiredReleaseWorkflowText in @(
+        'workflow_dispatch:',
+        'releaseTag:',
+        'releaseCommit:',
+        'contents: write',
+        'statuses: write',
+        'binderlab/standalone-verification',
+        'binderlab/release-verification',
+        'published tags must not move',
+        'git tag -a $env:RELEASE_TAG',
+        'git checkout --detach "refs/tags/$env:RELEASE_TAG"',
+        '.\verify.ps1',
+        '-BinderLabTag $env:RELEASE_TAG',
+        '-CaptureId $source.captureId',
+        '-EvidenceApkSha256 $source.apkSha256',
+        'BinderLab-api36.1-${{ inputs.releaseTag }}-verification',
+        'if-no-files-found: error'
+    )) {
+    if ($releaseWorkflowContent -notmatch [regex]::Escape($requiredReleaseWorkflowText)) {
+        throw "Manual release workflow is missing: $requiredReleaseWorkflowText"
+    }
+}
+foreach ($forbiddenReleaseWorkflowText in @(
+        'github.event.head_commit.message',
+        'if-no-files-found: warn',
+        'BinderLabTag "unreleased"'
+    )) {
+    if ($releaseWorkflowContent.Contains($forbiddenReleaseWorkflowText)) {
+        throw "Manual release workflow still contains: $forbiddenReleaseWorkflowText"
     }
 }
 
@@ -926,7 +1008,8 @@ if (-not [string]::IsNullOrWhiteSpace($DiffBase)) {
     EvidenceCaptureBinding = "passed"
     EvidencePrivacy = "passed"
     BinderLabLineEndings = "lf"
-    WorkflowLocation = "standalone-root"
+    VerifyWorkflow = "read-only-root"
+    ReleaseWorkflow = "manual-write-root"
     PublicRepositoryBoundary = "passed"
     OutboundMarkdownLinks = $outboundLinks.Count
     HandlerRuns = $committedAnalysis.handlerLatencyBaseline.runCount `

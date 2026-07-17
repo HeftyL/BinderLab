@@ -36,7 +36,7 @@
 
 日志是 BinderLab tag 的原始 `threadtime` 输出，不是整机全量 logcat。每一轮都先 `force-stop`、清 logcat，再启动一个 mode；采集脚本等待服务端完成 marker，而不是依赖固定 `Start-Sleep`。公开采集只接受 clean working tree，固定重新构建 APK，并在构建前冻结源码清单；分析后和正式发布前再次逐项比较，同时确认 Git HEAD 未变化，任一输入漂移都会拒绝发布。所有输出先写入 capture 专属 staging，只有文件集合完整、分析和上述来源检查全部通过后，才用 backup + rollback 的事务式目录发布替换正式目录。启动时发现残留 staging/backup 会中止并提示人工恢复；该设计避免普通异常造成新旧日志混合，但不宣称机器断电时仍是严格 crash-atomic replacement。
 
-`apkSha256` 只绑定“本次真机运行使用的 APK”。debug keystore 在每台机器本地生成，ZIP 时间等输入也可能变化，因此它不承诺读者重建后得到逐字节相同的 APK；源码一致性由 `source-manifest.sha256` 独立约束。两个 SHA-256 清单都是可复算的一致性索引，不是外部签名，也不提供不可伪造性；可信起点仍是公开 Git commit、仓库历史和远端 CI 记录。
+`source.txt` 的 `apkSha256` 只绑定“本次真机运行使用的 APK”。发布 artifact 把它显式抄录为 `evidenceApkSha256`，并另算本次 CI 构建的 `verificationApkSha256`；两者语义不同，不能用 CI 重建值冒充设备执行值。debug keystore 在每台机器本地生成，ZIP 时间等输入也可能变化，因此本证据不承诺读者重建后得到逐字节相同的 APK；源码一致性由 `source-manifest.sha256` 独立约束。两个证据清单和 artifact 清单都是可复算的一致性索引，不是外部签名，也不提供不可伪造性；可信起点仍是公开 Git commit、仓库历史和远端 CI 记录。
 
 本次 [`source.txt`](<source.txt>) 必须记录 `gitDirty=false`。`verify.ps1` 不只复算当前源码清单，还会把这些输入与 `gitCommit` 指向的 clean commit 比较；因此读者可以直接 checkout 该提交取得产生 APK 和日志的实验源码。`source-manifest.sha256` 与 APK SHA-256 继续保留，用于检测后续源码漂移和绑定本次设备实际安装的 APK。
 
