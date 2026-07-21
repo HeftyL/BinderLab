@@ -1,6 +1,7 @@
 # Evidence hashes are byte-for-byte and verified on Windows CI.
 .gitattributes text eol=lf
 .gitignore text eol=lf
+.github/*.yml text eol=lf
 .github/workflows/*.yml text eol=lf
 *.aidl text eol=lf
 *.java text eol=lf

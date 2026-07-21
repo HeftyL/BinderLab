@@ -447,7 +447,12 @@ $evidenceNarrativeDocuments = [ordered]@{
     (Join-Path $projectRoot "README.md") = @(
         "evidence/key-evidence.md#binder-key-handler",
         "evidence/analysis.json",
-        "blocked.queueNsMin - baseline.queueNsMax ~= injectedBlockerNs"
+        "blocked.queueNsMin - baseline.queueNsMax ~= injectedBlockerNs",
+        "github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md",
+        "github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.2/aidl/com/example/binderdemo",
+        "JDK 21.0.3",
+        "Temurin 21.x",
+        "| javac source / target | 8 / 8 |"
     )
     (Join-Path $evidenceRoot "README.md") = @(
         "key-evidence.md#binder-key-handler",
@@ -466,6 +471,13 @@ foreach ($path in $evidenceNarrativeDocuments.Keys) {
     if ($content -match $captureSpecificNumberPattern) {
         throw "Narrative document contains capture-specific timing '$($Matches[0])': $path"
     }
+}
+$publicReadmeContent = Get-Content `
+    -LiteralPath (Join-Path $projectRoot 'README.md') `
+    -Raw `
+    -Encoding UTF8
+if ($publicReadmeContent -notmatch 'v1\.2[^\r\n]*async/death[^\r\n]*capture[^\r\n]*marker[^\r\n]*atNs') {
+    throw "README must preserve the v1.2 async/death per-marker timestamp boundary"
 }
 
 $expectedEvidenceFiles = @(
@@ -751,6 +763,9 @@ $releaseWorkflowContent = Get-Content `
     -Raw `
     -Encoding UTF8
 foreach ($requiredWorkflowText in @(
+    'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
+    'actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9',
+    'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
     'build/BinderLab-debug.apk',
     'build/evidence-replay-report.json',
     'build/verification-provenance.txt',
@@ -788,6 +803,9 @@ foreach ($forbiddenVerifyWorkflowText in @(
     }
 }
 foreach ($requiredReleaseWorkflowText in @(
+        'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
+        'actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9',
+        'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
         'workflow_dispatch:',
         'releaseTag:',
         'releaseCommit:',
@@ -816,6 +834,24 @@ foreach ($forbiddenReleaseWorkflowText in @(
     )) {
     if ($releaseWorkflowContent.Contains($forbiddenReleaseWorkflowText)) {
         throw "Manual release workflow still contains: $forbiddenReleaseWorkflowText"
+    }
+}
+foreach ($workflow in @(
+        @{ Name = 'standalone'; Content = $verifyWorkflowContent },
+        @{ Name = 'release'; Content = $releaseWorkflowContent }
+    )) {
+    if ($workflow.Content -match 'uses:\s*actions/(?:checkout|setup-java|upload-artifact)@v\d') {
+        throw "BinderLab $($workflow.Name) workflow must pin third-party Actions to full commit SHAs"
+    }
+}
+$dependabotPath = Join-Path $gitRoot '.github\dependabot.yml'
+if (-not (Test-Path -LiteralPath $dependabotPath -PathType Leaf)) {
+    throw "BinderLab must configure Dependabot for pinned GitHub Actions"
+}
+$dependabotContent = Get-Content -LiteralPath $dependabotPath -Raw -Encoding UTF8
+foreach ($requiredDependabotText in @('package-ecosystem: github-actions', 'directory: "/"')) {
+    if (-not $dependabotContent.Contains($requiredDependabotText)) {
+        throw "BinderLab Dependabot config is missing: $requiredDependabotText"
     }
 }
 

@@ -9,11 +9,13 @@ git clone https://github.com/HeftyL/BinderLab.git
 cd .\BinderLab
 ```
 
-复核本文结果时使用证据发布 tag `android16-qpr2-evidence-v1.2`；`main` 可能继续变化：
+`main` 是当前开发线，本文中的相对链接用于浏览它的接口、脚本和验证结果。复核已发布证据时固定使用 tag `android16-qpr2-evidence-v1.2`：
 
 ```powershell
 git checkout --detach android16-qpr2-evidence-v1.2
 ```
+
+v1.2 固定入口：[关键证据](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md>)、[完整证据包](<https://github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.2/evidence>)、[AIDL 协议](<https://github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.2/aidl/com/example/binderdemo>)。
 
 实验基线：
 
@@ -25,10 +27,12 @@ git checkout --detach android16-qpr2-evidence-v1.2
 | minSdk | 26；只表示安装下限，未在 API 26 上运行验证 |
 | SDK 目录 | 默认 `D:\Android` |
 | Build Tools / AIDL | 36.0.0 / 36.0.0 |
-| JDK | 21；证据采集环境为 21.0.3，源码/目标级别 8 |
+| 证据 host | JDK 21.0.3 |
+| 远端 CI | Temurin 21.x |
+| javac source / target | 8 / 8 |
 | 实机证据 | Android 16 / API 36 |
 
-主结论先看[关键证据](<evidence/key-evidence.md>)；完整日志、APK metadata、设备与工具链信息见[真机证据包](<evidence/README.md>)。
+当前开发线的结果入口是[关键证据](<evidence/key-evidence.md>)与[证据说明](<evidence/README.md>)；复核 v1.2 时使用上面的固定 tag 链接。
 
 ## 一、接口与实验
 
@@ -219,17 +223,17 @@ C_ASYNC_CALL_RETURN < C_ASYNC_CALLBACK_OBSERVED
 
 ## 六、API 36 实机结果
 
-实验在 Android 16 / API 36 手机上逐项清日志运行。跨进程排序使用设备的 `elapsedRealtimeNanos()`；采集时间和时钟信息见 [`device.txt`](<evidence/device.txt>) 与 [`source.txt`](<evidence/source.txt>)。
+实验在 Android 16 / API 36 手机上逐项清日志运行。Handler、同步重入和 oneway 区间使用设备侧 `elapsedRealtimeNanos()` 排序和计算。v1.2 的 async/death 旧 capture 没有逐 marker `atNs`；这两条路径使用原始日志顺序、requestId、PID/TID 以及 generation 字段复核。采集时间和时钟信息见 v1.2 的 [`device.txt`](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/device.txt>) 与 [`source.txt`](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/source.txt>)。
 
 | mode | 实际观测 | 本次运行可以支持的结论 |
 |---|---|---|
-| `handler-latency-baseline` | [关键行](<evidence/key-evidence.md#binder-key-handler>)与[结构化分析](<evidence/analysis.json>)：固定轮数全部通过同 requestId、时间点顺序、算术分片和 duration 交叉检查 | 给 blocked 组提供同协议、同 Handler 路径的无长 blocker 基线；绝对耗时包含调度和测量握手 |
-| `handler-latency-blocked` | [关键行](<evidence/key-evidence.md#binder-key-handler>)与[结构化分析](<evidence/analysis.json>)：`post()` 自身仍短，新增等待集中在 `H0B → H1`；blocked 最小队列等待与 baseline 最大值之差接近注入的长 blocker 时长，即 `blocked.queueNsMin - baseline.queueNsMax ~= injectedBlockerNs` | 新增主要延迟位于 Handler 可观测等待，而不是 `post()` 调用；绝对值不是性能基准 |
-| `sync-reentry` | [关键行](<evidence/key-evidence.md#binder-key-sync-reentry>)：requestId 一致，五个 marker 顺序与 `atNs` 都严格递增；callback TID 等于外层等待 TID | 本次运行复用了原等待线程 |
-| `oneway-same-node` | [`oneway-same-node.log`](<evidence/oneway-same-node.log>)：第二笔客户端调用已返回时第一笔仍在执行，三个服务端区间仍依次执行 | 形成 backlog 后的结果与同 node oneway 串行一致 |
-| `oneway-cross-node` | [关键行](<evidence/key-evidence.md#binder-key-node>)与[结构化分析](<evidence/analysis.json>)：N1/N2 第二笔均提前提交；node 内串行；不同 Binder TID 上存在超过分析器门槛的显著重叠 | 排除了“第二笔发送太晚”“只有零星时间戳擦边”和“进程只有一条活跃 Binder 线程”三个替代解释 |
-| `async-callback` | [`async-callback.log`](<evidence/async-callback.log>)：同 requestId 的 post、run、callback、observed 严格成立；正反向业务 Proxy 与 BinderProxy 四个 class 均直接记录 | 服务端入口、Handler 与反向 callback 已在独立 run 中分离，正反向引用角色有直接 class 证据 |
-| `binder-death` | [关键行](<evidence/key-evidence.md#binder-key-death>)：generation 1 杀进程前最后一笔调用返回 42；随后 `binderDied` 失效当前代，受控旧代理探测抛 DeadObjectException，显式 rebind 发布 generation 2 且不重启实验 | 覆盖 T1、实际 T3→受控 T2 顺序、T4 与一次性 gate；不等于任意在途调用竞态或完整业务恢复 |
+| `handler-latency-baseline` | [关键行](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-handler>)与[结构化分析](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/analysis.json>)：固定轮数全部通过同 requestId、时间点顺序、算术分片和 duration 交叉检查 | 给 blocked 组提供同协议、同 Handler 路径的无长 blocker 基线；绝对耗时包含调度和测量握手 |
+| `handler-latency-blocked` | [关键行](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-handler>)与[结构化分析](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/analysis.json>)：`post()` 自身仍短，新增等待集中在 `H0B → H1`；blocked 最小队列等待与 baseline 最大值之差接近注入的长 blocker 时长，即 `blocked.queueNsMin - baseline.queueNsMax ~= injectedBlockerNs` | 新增主要延迟位于 Handler 可观测等待，而不是 `post()` 调用；绝对值不是性能基准 |
+| `sync-reentry` | [关键行](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-sync-reentry>)：requestId 一致，五个 marker 顺序与 `atNs` 都严格递增；callback TID 等于外层等待 TID | 本次运行复用了原等待线程 |
+| `oneway-same-node` | [`oneway-same-node.log`](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/oneway-same-node.log>)：第二笔客户端调用已返回时第一笔仍在执行，三个服务端区间仍依次执行 | 形成 backlog 后的结果与同 node oneway 串行一致 |
+| `oneway-cross-node` | [关键行](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-node>)与[结构化分析](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/analysis.json>)：N1/N2 第二笔均提前提交；node 内串行；不同 Binder TID 上存在超过分析器门槛的显著重叠 | 排除了“第二笔发送太晚”“只有零星时间戳擦边”和“进程只有一条活跃 Binder 线程”三个替代解释 |
+| `async-callback` | [`async-callback.log`](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/async-callback.log>)：同 requestId 的 post、run、callback、observed 严格成立；正反向业务 Proxy 与 BinderProxy 四个 class 均直接记录 | 服务端入口、Handler 与反向 callback 已在独立 run 中分离，正反向引用角色有直接 class 证据 |
+| `binder-death` | [关键行](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-death>)：generation 1 杀进程前最后一笔调用返回 42；随后 `binderDied` 失效当前代，受控旧代理探测抛 DeadObjectException，显式 rebind 发布 generation 2 且不重启实验 | 覆盖 T1、实际 T3→受控 T2 顺序、T4 与一次性 gate；不等于任意在途调用竞态或完整业务恢复 |
 
 这些结果来自受控实验，不是性能基线。换设备、负载或调度状态后，绝对时间和 TID 都可能变化；具体数值以 `key-evidence.md` 和 `analysis.json` 为准。
 
@@ -245,7 +249,7 @@ CONNECTING → LINKED → REGISTERED → ACTIVE → INVALID
 
 `linkToDeath()` 成功与 Java 状态转为 LINKED 之间存在窄窗口，因此清理不依赖 `deathLinked` 布尔值，而是无条件 best-effort `unlinkToDeath()`；“未注册、已死亡、已经解除”都作为可接受清理结果记录。相关状态转换、CAS 清理和受控旧 Proxy 探测均可由本仓代码与死亡实验日志直接复核。
 
-`binder-death` 先完成 generation 1 的成功事务，再杀死 `:remote`；死亡回调使旧代 INVALID，受控旧代理探测得到 `DeadObjectException`，随后实验代码显式 unbind/rebind 并发布 generation 2。完整顺序见[关键证据](<evidence/key-evidence.md#binder-key-death>)。
+`binder-death` 先完成 generation 1 的成功事务，再杀死 `:remote`；死亡回调使旧代 INVALID，受控旧代理探测得到 `DeadObjectException`，随后实验代码显式 unbind/rebind 并发布 generation 2。完整顺序见 v1.2 [关键证据](<https://github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md#binder-key-death>)。
 
 该实验不覆盖在途业务调用与死亡通知的自然竞态，也不验证迟到旧 `DeathRecipient`、自动重试、业务 session 恢复或多绑定连接管理。
 
