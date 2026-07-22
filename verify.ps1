@@ -448,8 +448,10 @@ $evidenceNarrativeDocuments = [ordered]@{
         "evidence/key-evidence.md#binder-key-handler",
         "evidence/analysis.json",
         "blocked.queueNsMin - baseline.queueNsMax ~= injectedBlockerNs",
-        "github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.2/evidence/key-evidence.md",
-        "github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.2/aidl/com/example/binderdemo",
+        "github.com/HeftyL/BinderLab/blob/android16-qpr2-evidence-v1.3/evidence/key-evidence.md",
+        "github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.3/aidl/com/example/binderdemo",
+        "github.com/HeftyL/BinderLab/releases/tag/android16-qpr2-evidence-v1.3",
+        "github.com/HeftyL/BinderLab/tree/android16-qpr2-evidence-v1.2/evidence",
         "JDK 21.0.3",
         "Temurin 21.x",
         "| javac source / target | 8 / 8 |"
@@ -476,8 +478,23 @@ $publicReadmeContent = Get-Content `
     -LiteralPath (Join-Path $projectRoot 'README.md') `
     -Raw `
     -Encoding UTF8
-if ($publicReadmeContent -notmatch 'v1\.2[^\r\n]*async/death[^\r\n]*capture[^\r\n]*marker[^\r\n]*atNs') {
-    throw "README must preserve the v1.2 async/death per-marker timestamp boundary"
+if ($publicReadmeContent -notmatch 'v1\.3[^\r\n]*v1\.2[^\r\n]*async/death[^\r\n]*capture[^\r\n]*marker[^\r\n]*atNs') {
+    throw "README must preserve the v1.3/v1.2 async/death per-marker timestamp boundary"
+}
+$v13ReleaseNotesPath = Join-Path $projectRoot 'releases\android16-qpr2-evidence-v1.3.md'
+if (-not (Test-Path -LiteralPath $v13ReleaseNotesPath -PathType Leaf)) {
+    throw "Missing v1.3 release notes"
+}
+$v13ReleaseNotes = Get-Content -LiteralPath $v13ReleaseNotesPath -Raw -Encoding UTF8
+foreach ($requiredReleaseNoteText in @(
+        'Evidence capture: reused from v1.2; no new device capture.',
+        'original logs',
+        'evidence/analysis.json',
+        'persistent GitHub Release downloads'
+    )) {
+    if (-not $v13ReleaseNotes.Contains($requiredReleaseNoteText)) {
+        throw "v1.3 release notes are missing: $requiredReleaseNoteText"
+    }
 }
 
 $expectedEvidenceFiles = @(
@@ -809,13 +826,23 @@ foreach ($requiredReleaseWorkflowText in @(
         'workflow_dispatch:',
         'releaseTag:',
         'releaseCommit:',
+        'Versioned annotated tag that publication policy forbids moving',
         'contents: write',
         'statuses: write',
         'binderlab/standalone-verification',
         'binderlab/release-verification',
         'published tags must not move',
+        'Checkout verified release commit',
+        'Rebuild and verify the release commit',
+        'Stage durable release assets',
+        'Create or verify policy-protected annotated tag',
+        'Verify and checkout published release tag',
+        'Publish durable GitHub Release assets',
         'git tag -a $env:RELEASE_TAG',
         'git checkout --detach "refs/tags/$env:RELEASE_TAG"',
+        'gh release create',
+        'gh release download',
+        'BinderLab-$releaseVersion-verification.zip',
         '.\verify.ps1',
         '-BinderLabTag $env:RELEASE_TAG',
         '-CaptureId $source.captureId',
@@ -830,10 +857,33 @@ foreach ($requiredReleaseWorkflowText in @(
 foreach ($forbiddenReleaseWorkflowText in @(
         'github.event.head_commit.message',
         'if-no-files-found: warn',
-        'BinderLabTag "unreleased"'
+        'BinderLabTag "unreleased"',
+        'Immutable annotated tag',
+        'Create or verify immutable annotated tag',
+        'Checkout immutable release tag',
+        'gh release upload',
+        '--clobber'
     )) {
     if ($releaseWorkflowContent.Contains($forbiddenReleaseWorkflowText)) {
         throw "Manual release workflow still contains: $forbiddenReleaseWorkflowText"
+    }
+}
+$releaseStepOrder = @(
+    $releaseWorkflowContent.IndexOf('- name: Checkout verified release commit'),
+    $releaseWorkflowContent.IndexOf('- name: Rebuild and verify the release commit'),
+    $releaseWorkflowContent.IndexOf('- name: Generate release-bound artifacts'),
+    $releaseWorkflowContent.IndexOf('- name: Stage durable release assets'),
+    $releaseWorkflowContent.IndexOf('- name: Create or verify policy-protected annotated tag'),
+    $releaseWorkflowContent.IndexOf('- name: Verify and checkout published release tag'),
+    $releaseWorkflowContent.IndexOf('- name: Upload tag-bound reproducibility artifacts'),
+    $releaseWorkflowContent.IndexOf('- name: Publish durable GitHub Release assets')
+)
+if ($releaseStepOrder -contains -1) {
+    throw "Could not resolve the required release workflow step order"
+}
+for ($index = 1; $index -lt $releaseStepOrder.Count; $index++) {
+    if ($releaseStepOrder[$index] -le $releaseStepOrder[$index - 1]) {
+        throw "Release workflow must rebuild, verify, and stage assets before publishing the tag"
     }
 }
 foreach ($workflow in @(
